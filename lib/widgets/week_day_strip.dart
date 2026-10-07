@@ -6,11 +6,14 @@ import '../utils/dates.dart';
 class WeekDayStrip extends StatelessWidget {
   final DateTime selectedDay;
   final ValueChanged<DateTime> onDaySelected;
+  // extra space on the left so the chips line up with the week columns
+  final double leftInset;
 
   const WeekDayStrip({
     super.key,
     required this.selectedDay,
     required this.onDaySelected,
+    this.leftInset = 0,
   });
 
   @override
@@ -18,7 +21,7 @@ class WeekDayStrip extends StatelessWidget {
     final monday = startOfWeek(selectedDay);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: EdgeInsets.fromLTRB(8 + leftInset, 8, 8, 8),
       child: Row(
         children: List.generate(7, (i) {
           final day = DateTime(monday.year, monday.month, monday.day + i);

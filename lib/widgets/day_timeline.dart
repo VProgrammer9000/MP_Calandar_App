@@ -4,7 +4,7 @@ import '../models/calendar_event.dart';
 import '../utils/dates.dart';
 
 const double hourHeight = 64;
-const double _labelWidth = 44;
+const double hourLabelWidth = 44;
 
 // Scrollable 24 hour column with the events of one day placed on it
 class DayTimeline extends StatefulWidget {
@@ -48,13 +48,13 @@ class _DayTimelineState extends State<DayTimeline> {
                 top: hour * hourHeight,
                 left: 0,
                 right: 0,
-                child: _HourLine(hour: hour),
+                child: HourLine(hour: hour),
               ),
             for (final event in widget.events)
               Positioned(
                 top: _minutesToY(event.start),
                 height: _minutesToY(event.end) - _minutesToY(event.start),
-                left: _labelWidth + 4,
+                left: hourLabelWidth + 4,
                 right: 12,
                 child: _EventBlock(
                   event: event,
@@ -68,10 +68,10 @@ class _DayTimelineState extends State<DayTimeline> {
   }
 }
 
-class _HourLine extends StatelessWidget {
+class HourLine extends StatelessWidget {
   final int hour;
 
-  const _HourLine({required this.hour});
+  const HourLine({super.key, required this.hour});
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +79,7 @@ class _HourLine extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: _labelWidth,
+          width: hourLabelWidth,
           child: Padding(
             padding: const EdgeInsets.only(left: 12, top: 4),
             child: Text(

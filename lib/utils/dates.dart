@@ -44,13 +44,25 @@ String twoDigits(int n) => n.toString().padLeft(2, '0');
 
 String formatTime(DateTime d) => '${twoDigits(d.hour)}:${twoDigits(d.minute)}';
 
-// e.g. "WEEK 38 · SEP 14-20"
-String weekLabel(DateTime d) {
+DateTime addDays(DateTime d, int days) =>
+    DateTime(d.year, d.month, d.day + days);
+
+// whole days from a to b (done in utc so summer time doesn't mess it up)
+int daysBetween(DateTime a, DateTime b) => DateTime.utc(b.year, b.month, b.day)
+    .difference(DateTime.utc(a.year, a.month, a.day))
+    .inDays;
+
+// e.g. "Sep 14 - 20"
+String weekRange(DateTime d) {
   final monday = startOfWeek(d);
-  final sunday = DateTime(monday.year, monday.month, monday.day + 6);
+  final sunday = addDays(monday, 6);
   final start = '${monthNames[monday.month - 1]} ${monday.day}';
   final end = monday.month == sunday.month
       ? '${sunday.day}'
       : '${monthNames[sunday.month - 1]} ${sunday.day}';
-  return 'WEEK ${weekNumber(d)} · $start-$end'.toUpperCase();
+  return '$start - $end';
 }
+
+// e.g. "WEEK 38 · SEP 14 - 20"
+String weekLabel(DateTime d) =>
+    'WEEK ${weekNumber(d)} · ${weekRange(d)}'.toUpperCase();

@@ -86,10 +86,46 @@ class TasksScreen extends StatelessWidget {
               ),
             ),
             const Divider(height: 2, thickness: 2, color: Colors.black),
-            // TODO: filters and task list
+            buildFilterRow(),
+            Divider(height: 1, color: Colors.grey.shade300),
+            // TODO: task list
             const Expanded(child: Center(child: Text('Tasks come here'))),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget buildFilterRow() {
+    final filters = ['All', 'Flexible', 'Fixed', 'Due'];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Row(
+        children: [
+          for (final filter in filters)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                label: Text(filter),
+                // only "All" is selected for now
+                selected: filter == 'All',
+                showCheckmark: false,
+                selectedColor: Colors.black,
+                backgroundColor: Colors.white,
+                labelStyle: TextStyle(
+                  color: filter == 'All' ? Colors.white : Colors.black,
+                ),
+                shape: const RoundedRectangleBorder(
+                  side: BorderSide(color: Colors.grey),
+                ),
+                onSelected: (selected) {
+                  // TODO: filter the list
+                },
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -109,6 +109,15 @@ class TasksScreen extends StatelessWidget {
           ],
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(),
+        onPressed: () {
+          // TODO: open the add task page
+        },
+        child: const Icon(Icons.add),
+      ),
     );
   }
 

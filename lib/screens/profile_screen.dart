@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'import_export_screen.dart';
 import 'labels_screen.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
@@ -57,7 +58,12 @@ class ProfileScreen extends StatelessWidget {
               title: 'Import & export',
               count: 2,
               onTap: () {
-                // TODO: open import & export screen (1n)
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ImportExportScreen(),
+                  ),
+                );
               },
             ),
             const Divider(height: 1),

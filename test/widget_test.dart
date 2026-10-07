@@ -15,6 +15,7 @@ void main() {
 
     await tester.tap(find.text('Tasks'));
     await tester.pumpAndSettle();
-    expect(find.text('Tasks come here'), findsOneWidget);
+    expect(find.text('All'), findsOneWidget);
+    expect(find.byType(CheckboxListTile), findsWidgets);
   });
 }

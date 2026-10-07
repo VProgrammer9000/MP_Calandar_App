@@ -1,6 +1,7 @@
 import 'package:chrono/main.dart';
 import 'package:chrono/screens/calendar_screen.dart';
 import 'package:chrono/widgets/day_timeline.dart';
+import 'package:chrono/widgets/month_grid.dart';
 import 'package:chrono/widgets/week_timeline.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +26,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(WeekTimeline), findsOneWidget);
     expect(find.textContaining('WEEK '), findsOneWidget);
+
+    await tester.tap(find.text('Month'));
+    await tester.pumpAndSettle();
+    expect(find.byType(MonthGrid), findsOneWidget);
 
     await tester.tap(find.text('Tasks'));
     await tester.pumpAndSettle();

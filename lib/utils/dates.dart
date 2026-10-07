@@ -23,6 +23,21 @@ const monthNames = [
   'Dec',
 ];
 
+const monthFullNames = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
 DateTime dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
 bool isSameDay(DateTime a, DateTime b) =>
@@ -46,6 +61,15 @@ String formatTime(DateTime d) => '${twoDigits(d.hour)}:${twoDigits(d.minute)}';
 
 DateTime addDays(DateTime d, int days) =>
     DateTime(d.year, d.month, d.day + days);
+
+int daysInMonth(DateTime d) => DateTime(d.year, d.month + 1, 0).day;
+
+// same day number in another month, or the last day if that month is shorter
+DateTime addMonths(DateTime d, int months) {
+  final first = DateTime(d.year, d.month + months, 1);
+  final day = d.day > daysInMonth(first) ? daysInMonth(first) : d.day;
+  return DateTime(first.year, first.month, day);
+}
 
 // whole days from a to b (done in utc so summer time doesn't mess it up)
 int daysBetween(DateTime a, DateTime b) => DateTime.utc(b.year, b.month, b.day)

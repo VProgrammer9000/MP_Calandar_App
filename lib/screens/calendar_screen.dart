@@ -4,6 +4,7 @@ import '../models/calendar_event.dart';
 import '../utils/dates.dart';
 import '../widgets/calendar_pager.dart';
 import '../widgets/day_timeline.dart';
+import '../widgets/month_grid.dart';
 import '../widgets/week_day_strip.dart';
 import '../widgets/week_timeline.dart';
 
@@ -23,6 +24,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   // fingers on the screen, used to detect a pinch
   final Map<int, Offset> _pointers = {};
+  final Map<int, Offset> _pointerStarts = {};
   double? _pinchStartDistance;
 
   void _goToDay(DateTime day) {
@@ -34,6 +36,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _onPointerDown(PointerDownEvent e) {
     _pointers[e.pointer] = e.position;
+    _pointerStarts[e.pointer] = e.position;
     if (_pointers.length == 2) _pinchStartDistance = _pointerDistance();
   }
 
@@ -43,12 +46,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   // pinch out zooms in (month -> week -> day), pinch in zooms out
   void _onPointerUp(PointerEvent e) {
-    if (_pointers.length == 2 && _pinchStartDistance != null) {
+    // both fingers have to move, so a finger that got stuck can't make
+    // a normal swipe count as a pinch
+    final bothMoved = _pointers.keys.every(
+      (id) => (_pointers[id]! - _pointerStarts[id]!).distance > 10,
+    );
+    if (_pointers.length == 2 && _pinchStartDistance != null && bothMoved) {
       final scale = _pointerDistance() / _pinchStartDistance!;
       if (scale > 1.4) _zoom(-1);
       if (scale < 0.7) _zoom(1);
     }
     _pointers.remove(e.pointer);
+    _pointerStarts.remove(e.pointer);
     if (_pointers.length < 2) _pinchStartDistance = null;
   }
 
@@ -65,6 +74,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   List<CalendarEvent> _eventsFor(DateTime day) =>
       _events.where((e) => isSameDay(e.start, day)).toList();
+
+  List<CalendarEvent> _eventsForMonth(DateTime month) => _events
+      .where((e) => e.start.year == month.year && e.start.month == month.month)
+      .toList();
 
   List<CalendarEvent> _eventsForWeek(DateTime weekStart) => _events.where((e) {
         final offset = daysBetween(weekStart, e.start);
@@ -152,7 +165,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
             // tapping a day in the week opens it in the day view
             WeekDayStrip(
               selectedDay: _selectedDay,
-              leftInset: hourLabelWidth - 8,
               onDaySelected: (day) {
                 setState(() {
                   _selectedDay = day;
@@ -165,7 +177,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               child: CalendarPager(
                 key: const ValueKey(CalendarView.week),
                 date: _selectedDay,
-                weekly: true,
+                step: PageStep.week,
                 onDateChanged: _goToDay,
                 builder: (context, day) {
                   final weekStart = startOfWeek(day);
@@ -180,8 +192,48 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ],
         );
       case CalendarView.month:
-        // TODO: month view (1e)
-        return const SizedBox.expand();
+        return CalendarPager(
+          key: const ValueKey(CalendarView.month),
+          date: _selectedDay,
+          step: PageStep.month,
+          onDateChanged: _goToDay,
+          builder: (context, day) => MonthGrid(
+            month: day,
+            today: _today,
+            events: _eventsForMonth(day),
+            onDayTap: (day) {
+              setState(() {
+                _selectedDay = day;
+                _view = CalendarView.day;
+              });
+            },
+            // TODO: quick add a task on that day
+            onDayLongPress: (day) {},
+          ),
+        );
+    }
+  }
+
+  // small text above the title, e.g. "WEEK 38 · SEP 14 - 20"
+  String _headerLabel() {
+    switch (_view) {
+      case CalendarView.day:
+        return weekLabel(_selectedDay);
+      case CalendarView.week:
+        return 'WEEK ${weekNumber(_selectedDay)}';
+      case CalendarView.month:
+        return '${_selectedDay.year}';
+    }
+  }
+
+  String _headerTitle() {
+    switch (_view) {
+      case CalendarView.day:
+        return '${weekdayNames[_selectedDay.weekday - 1]} ${_selectedDay.day}';
+      case CalendarView.week:
+        return weekRange(_selectedDay);
+      case CalendarView.month:
+        return monthFullNames[_selectedDay.month - 1];
     }
   }
 
@@ -192,9 +244,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _view == CalendarView.week
-                ? 'WEEK ${weekNumber(_selectedDay)}'
-                : weekLabel(_selectedDay),
+            _headerLabel(),
             style: const TextStyle(
               fontSize: 12,
               letterSpacing: 1,
@@ -203,9 +253,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            _view == CalendarView.week
-                ? weekRange(_selectedDay)
-                : '${weekdayNames[_selectedDay.weekday - 1]} ${_selectedDay.day}',
+            _headerTitle(),
             style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w500),
           ),
         ],

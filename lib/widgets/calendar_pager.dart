@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../utils/dates.dart';
 
-// Swipe left/right to move one day (or one week if weekly is true).
+enum PageStep { day, week, month }
+
+// Swipe left/right to move one day, week or month.
 // The PageView has no real start, so page 10000 is the date we opened on
 // and we count from there.
 class CalendarPager extends StatefulWidget {
   final DateTime date;
-  final bool weekly;
+  final PageStep step;
   final ValueChanged<DateTime> onDateChanged;
   final Widget Function(BuildContext context, DateTime date) builder;
 
@@ -16,7 +18,7 @@ class CalendarPager extends StatefulWidget {
     required this.date,
     required this.onDateChanged,
     required this.builder,
-    this.weekly = false,
+    this.step = PageStep.day,
   });
 
   @override
@@ -29,18 +31,32 @@ class _CalendarPagerState extends State<CalendarPager> {
   late final DateTime _startDate = widget.date;
   final _controller = PageController(initialPage: _startPage);
 
-  int get _step => widget.weekly ? 7 : 1;
-
   int _pageFor(DateTime d) {
-    if (widget.weekly) {
-      return _startPage +
-          daysBetween(startOfWeek(_startDate), startOfWeek(d)) ~/ 7;
+    switch (widget.step) {
+      case PageStep.day:
+        return _startPage + daysBetween(_startDate, d);
+      case PageStep.week:
+        return _startPage +
+            daysBetween(startOfWeek(_startDate), startOfWeek(d)) ~/ 7;
+      case PageStep.month:
+        return _startPage +
+            (d.year - _startDate.year) * 12 +
+            d.month -
+            _startDate.month;
     }
-    return _startPage + daysBetween(_startDate, d);
   }
 
-  DateTime _dateFor(int page) =>
-      addDays(_startDate, (page - _startPage) * _step);
+  // move the date by a number of pages
+  DateTime _move(DateTime d, int pages) {
+    switch (widget.step) {
+      case PageStep.day:
+        return addDays(d, pages);
+      case PageStep.week:
+        return addDays(d, pages * 7);
+      case PageStep.month:
+        return addMonths(d, pages);
+    }
+  }
 
   @override
   void didUpdateWidget(CalendarPager oldWidget) {
@@ -64,11 +80,10 @@ class _CalendarPagerState extends State<CalendarPager> {
       controller: _controller,
       onPageChanged: (page) {
         final moved = page - _pageFor(widget.date);
-        if (moved != 0) {
-          widget.onDateChanged(addDays(widget.date, moved * _step));
-        }
+        if (moved != 0) widget.onDateChanged(_move(widget.date, moved));
       },
-      itemBuilder: (context, page) => widget.builder(context, _dateFor(page)),
+      itemBuilder: (context, page) =>
+          widget.builder(context, _move(_startDate, page - _startPage)),
     );
   }
 }

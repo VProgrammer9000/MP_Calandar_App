@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/add_by_form.dart';
 import '../widgets/add_by_prompt.dart';
 
 enum AddMode { prompt, form }
@@ -51,8 +52,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             Expanded(
               child: _mode == AddMode.prompt
                   ? const AddByPrompt()
-                  // TODO: add by form (1h)
-                  : const SizedBox(),
+                  : const AddByForm(),
             ),
           ],
         ),

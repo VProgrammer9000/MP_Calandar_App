@@ -19,4 +19,29 @@ void main() {
       'Gym 3x this week',
     );
   });
+
+  testWidgets('add by form needs a title', (tester) async {
+    tester.view.physicalSize = const Size(375, 812);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const MaterialApp(home: AddTaskScreen()));
+    await tester.tap(find.text('Form'));
+    await tester.pumpAndSettle();
+    expect(find.text('earliest start'), findsOneWidget);
+
+    await tester.dragUntilVisible(
+      find.text('Schedule it'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.text('Schedule it'));
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      find.text('Give it a title'),
+      find.byType(ListView),
+      const Offset(0, 200),
+    );
+    expect(find.text('Give it a title'), findsOneWidget);
+  });
 }

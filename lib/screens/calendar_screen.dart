@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/sample_data.dart';
 import '../models/calendar_event.dart';
 import '../utils/dates.dart';
 import '../widgets/calendar_pager.dart';
@@ -67,8 +68,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     setState(() => _view = CalendarView.values[index]);
   }
 
-  // TODO: load the user's events
-  final List<CalendarEvent> _events = [];
+  // TODO: load the user's events, sample events for now
+  final List<CalendarEvent> _events = sampleEvents();
 
   // TODO: filled in by the smart rescheduler, banner is hidden while null
   String? _rescheduleMessage;

@@ -90,3 +90,15 @@ String weekRange(DateTime d) {
 // e.g. "WEEK 38 · SEP 14 - 20"
 String weekLabel(DateTime d) =>
     'WEEK ${weekNumber(d)} · ${weekRange(d)}'.toUpperCase();
+
+// e.g. "6h", "1h 30m", "45m"
+String formatDuration(Duration d) {
+  final hours = d.inHours;
+  final minutes = d.inMinutes % 60;
+  if (hours == 0) return '${minutes}m';
+  return minutes == 0 ? '${hours}h' : '${hours}h ${minutes}m';
+}
+
+// e.g. "Fri 16 Oct"
+String formatShortDate(DateTime d) =>
+    '${weekdayNames[d.weekday - 1].substring(0, 3)} ${d.day} ${monthNames[d.month - 1]}';

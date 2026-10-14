@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'add_task_screen.dart';
+
 // Some fake tasks so the layout has something to show.
 // TODO: replace with a real Task model when we add the data part
 final List<Map<String, dynamic>> sampleTasks = [
@@ -114,7 +116,10 @@ class TasksScreen extends StatelessWidget {
         foregroundColor: Colors.white,
         shape: const RoundedRectangleBorder(),
         onPressed: () {
-          // TODO: open the add task page
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddTaskScreen()),
+          );
         },
         child: const Icon(Icons.add),
       ),

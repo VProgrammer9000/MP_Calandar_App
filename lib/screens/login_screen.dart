@@ -37,6 +37,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _onForgotPasswordPressed() {}
 
+  // TODO: remove this when login works, only so we can test the app
+  void _onSkipLoginPressed() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const HomeScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -175,6 +183,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextButton(
                   onPressed: _onForgotPasswordPressed,
                   child: const Text('Forgot password?'),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(foregroundColor: Colors.grey),
+                  onPressed: _onSkipLoginPressed,
+                  child: const Text('Skip login'),
                 ),
               ],
             ),

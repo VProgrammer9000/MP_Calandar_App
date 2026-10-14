@@ -50,4 +50,20 @@ void main() {
     expect(find.text('All'), findsOneWidget);
     expect(find.byType(CheckboxListTile), findsWidgets);
   });
+
+  testWidgets('skip login goes straight to the tabs', (tester) async {
+    tester.view.physicalSize = const Size(375, 812);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const ChronoApp());
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+
+    final skipButton = find.text('Skip login');
+    await tester.ensureVisible(skipButton);
+    await tester.tap(skipButton);
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationBar), findsOneWidget);
+  });
 }

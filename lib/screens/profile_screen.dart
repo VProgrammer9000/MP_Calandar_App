@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'labels_screen.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
 
@@ -45,7 +46,10 @@ class ProfileScreen extends StatelessWidget {
               title: 'Labels & categories',
               count: 4,
               onTap: () {
-                // TODO: open labels screen (1k)
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LabelsScreen()),
+                );
               },
             ),
             const Divider(height: 1),

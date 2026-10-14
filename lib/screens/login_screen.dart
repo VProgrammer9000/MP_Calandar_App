@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'home_screen.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -20,11 +22,28 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _onLoginPressed() {}
+  void _onLoginPressed() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    // TODO: check the email and password for real (supabase?)
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const HomeScreen()),
+    );
+  }
 
   void _onGoogleLoginPressed() {}
 
   void _onForgotPasswordPressed() {}
+
+  // TODO: remove this when login works, only so we can test the app
+  void _onSkipLoginPressed() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const HomeScreen()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -164,6 +183,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextButton(
                   onPressed: _onForgotPasswordPressed,
                   child: const Text('Forgot password?'),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(foregroundColor: Colors.grey),
+                  onPressed: _onSkipLoginPressed,
+                  child: const Text('Skip login'),
                 ),
               ],
             ),

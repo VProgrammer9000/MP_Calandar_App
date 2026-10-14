@@ -6,11 +6,15 @@ import '../utils/dates.dart';
 class WeekDayStrip extends StatelessWidget {
   final DateTime selectedDay;
   final ValueChanged<DateTime> onDaySelected;
+  // space on the left and right of the row. The week view uses the hour label
+  // width here so every day lines up with its column in the grid below
+  final EdgeInsets padding;
 
   const WeekDayStrip({
     super.key,
     required this.selectedDay,
     required this.onDaySelected,
+    this.padding = const EdgeInsets.symmetric(horizontal: 8),
   });
 
   @override
@@ -18,7 +22,7 @@ class WeekDayStrip extends StatelessWidget {
     final monday = startOfWeek(selectedDay);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: padding.add(const EdgeInsets.symmetric(vertical: 8)),
       child: Row(
         children: List.generate(7, (i) {
           final day = DateTime(monday.year, monday.month, monday.day + i);

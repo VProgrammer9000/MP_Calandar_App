@@ -114,7 +114,8 @@ class _WeekEventBlock extends StatelessWidget {
                 event.title,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 10),
+                // small so words like "shopping" fit in the narrow columns
+                style: const TextStyle(fontSize: 9),
               ),
             ),
           ),

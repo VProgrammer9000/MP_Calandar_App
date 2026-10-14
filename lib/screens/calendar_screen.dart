@@ -171,6 +171,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
             // tapping a day in the week opens it in the day view
             WeekDayStrip(
               selectedDay: _selectedDay,
+              padding: const EdgeInsets.only(
+                left: hourLabelWidth,
+                right: weekGridRightPadding,
+              ),
               onDaySelected: (day) {
                 setState(() {
                   _selectedDay = day;

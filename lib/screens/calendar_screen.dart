@@ -5,6 +5,7 @@ import '../models/calendar_event.dart';
 import '../utils/dates.dart';
 import '../widgets/calendar_pager.dart';
 import '../widgets/day_timeline.dart';
+import '../widgets/event_detail_sheet.dart';
 import '../widgets/month_grid.dart';
 import '../widgets/week_day_strip.dart';
 import '../widgets/week_timeline.dart';
@@ -86,21 +87,38 @@ class _CalendarScreenState extends State<CalendarScreen> {
         return offset >= 0 && offset < 7;
       }).toList();
 
+  // the detail / edit sheet (1o) opens from the bottom
   void _showEventDetails(CalendarEvent event) {
-    // TODO: real detail / edit sheet (1o)
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(event.title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text('${formatTime(event.start)}-${formatTime(event.end)}'),
-            Text(event.fixed ? 'Fixed' : 'Flexible'),
-          ],
+    showEventDetailSheet(
+      context,
+      event: event,
+      onSave: (updated) {
+        setState(() {
+          final index = _events.indexOf(event);
+          if (index != -1) _events[index] = updated;
+        });
+      },
+      onDelete: () => _deleteEvent(event),
+      // TODO: open smart reschedule (1j)
+      onReschedule: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Smart reschedule is not ready yet')),
+        );
+      },
+    );
+  }
+
+  void _deleteEvent(CalendarEvent event) {
+    final index = _events.indexOf(event);
+    setState(() => _events.remove(event));
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Deleted "${event.title}"'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => setState(() => _events.insert(index, event)),
         ),
       ),
     );

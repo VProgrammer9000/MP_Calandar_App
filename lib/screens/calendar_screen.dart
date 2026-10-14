@@ -7,6 +7,7 @@ import '../widgets/day_timeline.dart';
 import '../widgets/month_grid.dart';
 import '../widgets/week_day_strip.dart';
 import '../widgets/week_timeline.dart';
+import 'add_task_screen.dart';
 
 enum CalendarView { day, week, month }
 
@@ -132,8 +133,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         shape: const RoundedRectangleBorder(),
-        // TODO: open add task (by prompt or form)
-        onPressed: () {},
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddTaskScreen()),
+          );
+        },
         child: const Icon(Icons.add),
       ),
     );

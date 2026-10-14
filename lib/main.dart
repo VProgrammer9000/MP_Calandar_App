@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'screens/login_screen.dart';
+import 'screens/onboarding_screen.dart';
 
 void main() {
   runApp(const ChronoApp());
@@ -23,7 +23,7 @@ class ChronoApp extends StatelessWidget {
           surfaceTintColor: Colors.white,
         ),
       ),
-      home: const LoginScreen(),
+      home: const OnboardingScreen(),
     );
   }
 }

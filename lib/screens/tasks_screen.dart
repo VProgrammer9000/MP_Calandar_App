@@ -1,73 +1,97 @@
 import 'package:flutter/material.dart';
 
+import '../data/sample_data.dart';
+import '../models/task.dart';
+import '../models/task_draft.dart';
+import '../utils/dates.dart';
 import 'add_task_screen.dart';
 
-// Some fake tasks so the layout has something to show.
-// TODO: replace with a real Task model when we add the data part
-final List<Map<String, dynamic>> sampleTasks = [
-  {
-    'title': 'Task title',
-    'description': 'Description',
-    'label': 'University',
-    'isFixed': false,
-    'minutes': 360,
-    'done': false,
-  },
-  {
-    'title': 'Task title',
-    'description': 'Description',
-    'label': 'University',
-    'isFixed': false,
-    'minutes': 180,
-    'done': false,
-  },
-  {
-    'title': 'Task title',
-    'description': 'Description',
-    'label': 'Work',
-    'isFixed': true,
-    'minutes': 720,
-    'done': false,
-  },
-  {
-    'title': 'Task title',
-    'description': 'Description',
-    'label': 'Health',
-    'isFixed': false,
-    'minutes': 180,
-    'done': true,
-  },
-  {
-    'title': 'Task title',
-    'description': 'Description',
-    'label': 'Personal',
-    'isFixed': false,
-    'minutes': 15,
-    'done': false,
-  },
-];
-
-class TasksScreen extends StatelessWidget {
+class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
 
-  // 360 -> "6h", 15 -> "15m"
+  @override
+  State<TasksScreen> createState() => _TasksScreenState();
+}
+
+class _TasksScreenState extends State<TasksScreen> {
+  final filters = ['All', 'Flexible', 'Fixed', 'Due'];
+  String selectedFilter = 'All';
+
+  // 360 -> "6h", 90 -> "1h 30m", 15 -> "15m"
   String formatLength(int minutes) {
     if (minutes < 60) {
       return '${minutes}m';
     }
-    return '${minutes ~/ 60}h';
+    if (minutes % 60 == 0) {
+      return '${minutes ~/ 60}h';
+    }
+    return '${minutes ~/ 60}h ${minutes % 60}m';
+  }
+
+  // the tasks to show for the selected filter
+  List<Task> visibleTasks() {
+    if (selectedFilter == 'Flexible') {
+      return myTasks.where((task) => !task.fixed).toList();
+    }
+    if (selectedFilter == 'Fixed') {
+      return myTasks.where((task) => task.fixed).toList();
+    }
+    if (selectedFilter == 'Due') {
+      // only tasks with a deadline, the closest one first
+      final due = myTasks.where((task) => task.deadline != null).toList();
+      due.sort((a, b) => a.deadline!.compareTo(b.deadline!));
+      return due;
+    }
+    return myTasks;
+  }
+
+  Future<void> openAddTask() async {
+    // the form gives back a TaskDraft when the user taps "Schedule it"
+    final draft = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddTaskScreen()),
+    );
+    if (draft is TaskDraft) {
+      setState(() {
+        myTasks.insert(0, Task.fromDraft(draft));
+      });
+    }
+  }
+
+  void deleteTask(Task task) {
+    final index = myTasks.indexOf(task);
+    setState(() {
+      myTasks.remove(task);
+    });
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Deleted "${task.title}"'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            setState(() {
+              myTasks.insert(index, task);
+            });
+          },
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     int openCount = 0;
     int openMinutes = 0;
-    for (final task in sampleTasks) {
-      if (task['done'] == false) {
+    for (final task in myTasks) {
+      if (!task.done) {
         openCount++;
-        openMinutes += task['minutes'] as int;
+        openMinutes += task.minutes;
       }
     }
+
+    final tasks = visibleTasks();
 
     return Scaffold(
       body: SafeArea(
@@ -99,14 +123,21 @@ class TasksScreen extends StatelessWidget {
             buildFilterRow(),
             Divider(height: 1, color: Colors.grey.shade300),
             Expanded(
-              child: ListView.separated(
-                itemCount: sampleTasks.length,
-                separatorBuilder: (context, index) =>
-                    Divider(height: 1, color: Colors.grey.shade300),
-                itemBuilder: (context, index) {
-                  return buildTaskTile(sampleTasks[index]);
-                },
-              ),
+              child: tasks.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No tasks here',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    )
+                  : ListView.separated(
+                      itemCount: tasks.length,
+                      separatorBuilder: (context, index) =>
+                          Divider(height: 1, color: Colors.grey.shade300),
+                      itemBuilder: (context, index) {
+                        return buildTaskTile(tasks[index]);
+                      },
+                    ),
             ),
           ],
         ),
@@ -115,20 +146,13 @@ class TasksScreen extends StatelessWidget {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         shape: const RoundedRectangleBorder(),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddTaskScreen()),
-          );
-        },
+        onPressed: openAddTask,
         child: const Icon(Icons.add),
       ),
     );
   }
 
   Widget buildFilterRow() {
-    final filters = ['All', 'Flexible', 'Fixed', 'Due'];
-
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -139,19 +163,20 @@ class TasksScreen extends StatelessWidget {
               padding: const EdgeInsets.only(right: 8),
               child: FilterChip(
                 label: Text(filter),
-                // only "All" is selected for now
-                selected: filter == 'All',
+                selected: filter == selectedFilter,
                 showCheckmark: false,
                 selectedColor: Colors.black,
                 backgroundColor: Colors.white,
                 labelStyle: TextStyle(
-                  color: filter == 'All' ? Colors.white : Colors.black,
+                  color: filter == selectedFilter ? Colors.white : Colors.black,
                 ),
                 shape: const RoundedRectangleBorder(
                   side: BorderSide(color: Colors.grey),
                 ),
                 onSelected: (selected) {
-                  // TODO: filter the list
+                  setState(() {
+                    selectedFilter = filter;
+                  });
                 },
               ),
             ),
@@ -160,42 +185,63 @@ class TasksScreen extends StatelessWidget {
     );
   }
 
-  Widget buildTaskTile(Map<String, dynamic> task) {
-    return CheckboxListTile(
-      value: task['done'],
-      controlAffinity: ListTileControlAffinity.leading,
-      activeColor: Colors.black,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      onChanged: (value) {
-        // TODO: mark the task as done
-      },
-      title: Text(
-        task['title'],
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+  Widget buildTaskTile(Task task) {
+    // swipe left to delete
+    return Dismissible(
+      key: ObjectKey(task),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        color: Colors.red.shade700,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: const Icon(Icons.delete_outline, color: Colors.white),
       ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 2),
-          Text(task['description'], style: const TextStyle(color: Colors.grey)),
-          const SizedBox(height: 8),
-          // Wrap so the tags go to a new line on small screens
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: [
-              buildTag(task['label'], Colors.white),
-              buildTag(
-                task['isFixed'] ? 'Fixed' : 'Flexible',
-                Colors.grey.shade200,
-              ),
-            ],
+      onDismissed: (direction) => deleteTask(task),
+      child: CheckboxListTile(
+        value: task.done,
+        controlAffinity: ListTileControlAffinity.leading,
+        activeColor: Colors.black,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        onChanged: (value) {
+          setState(() {
+            task.done = value ?? false;
+          });
+        },
+        title: Text(
+          task.title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            // done tasks are crossed out
+            color: task.done ? Colors.grey : Colors.black,
+            decoration: task.done ? TextDecoration.lineThrough : null,
           ),
-        ],
-      ),
-      secondary: Text(
-        formatLength(task['minutes']),
-        style: const TextStyle(color: Colors.grey),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (task.description.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(task.description, style: const TextStyle(color: Colors.grey)),
+            ],
+            const SizedBox(height: 8),
+            // Wrap so the tags go to a new line on small screens
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (task.label != null) buildTag(task.label!, Colors.white),
+                buildTag(task.fixed ? 'Fixed' : 'Flexible', Colors.grey.shade200),
+                if (task.deadline != null)
+                  buildTag('Due ${formatShortDate(task.deadline!)}', Colors.white),
+              ],
+            ),
+          ],
+        ),
+        secondary: Text(
+          formatLength(task.minutes),
+          style: const TextStyle(color: Colors.grey),
+        ),
       ),
     );
   }

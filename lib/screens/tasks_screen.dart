@@ -174,10 +174,12 @@ class TasksScreen extends StatelessWidget {
           const SizedBox(height: 2),
           Text(task['description'], style: const TextStyle(color: Colors.grey)),
           const SizedBox(height: 8),
-          Row(
+          // Wrap so the tags go to a new line on small screens
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
             children: [
               buildTag(task['label'], Colors.white),
-              const SizedBox(width: 6),
               buildTag(
                 task['isFixed'] ? 'Fixed' : 'Flexible',
                 Colors.grey.shade200,

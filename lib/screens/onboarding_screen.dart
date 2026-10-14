@@ -1,11 +1,25 @@
 import 'package:flutter/material.dart';
 
+import 'login_screen.dart';
+
 class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
 
-  void onNextPressed() {}
+  void goToLogin(BuildContext context) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+    );
+  }
 
-  void onSkipPressed() {}
+  // TODO: show the next onboarding step when we have more of them
+  void onNextPressed(BuildContext context) {
+    goToLogin(context);
+  }
+
+  void onSkipPressed(BuildContext context) {
+    goToLogin(context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,12 +99,12 @@ class OnboardingScreen extends StatelessWidget {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                onPressed: onNextPressed,
+                onPressed: () => onNextPressed(context),
                 child: const Text('Next'),
               ),
               TextButton(
                 style: TextButton.styleFrom(foregroundColor: Colors.grey),
-                onPressed: onSkipPressed,
+                onPressed: () => onSkipPressed(context),
                 child: const Text('Skip'),
               ),
             ],

@@ -8,10 +8,11 @@ import '../utils/dates.dart';
 
 // The key comes from the .env file when the app is started, see the README.
 // Never write the key in the code because the repo is public.
-const groqApiKey = String.fromEnvironment('GROQ_API_KEY');
-const groqUrl = 'https://api.groq.com/openai/v1/chat/completions';
-// Groq removes old models sometimes, see console.groq.com/docs/models
-const groqModel = 'openai/gpt-oss-20b';
+const openRouterApiKey = String.fromEnvironment('OPENROUTER_API_KEY');
+const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
+// This picks one of the free models for us, so we pay nothing and it keeps
+// working when a free model gets removed
+const llmModel = 'openrouter/free';
 
 // Has a message that is ok to show to the user
 class LlmException implements Exception {
@@ -30,12 +31,12 @@ Future<String> askLlm(
   bool wantJson = false,
   http.Client? client,
 }) async {
-  if (client == null && groqApiKey.isEmpty) {
+  if (client == null && openRouterApiKey.isEmpty) {
     throw LlmException('The API key is missing. See the README.');
   }
 
   final body = <String, dynamic>{
-    'model': groqModel,
+    'model': llmModel,
     'messages': messages,
     'temperature': 0.2,
   };
@@ -47,9 +48,9 @@ Future<String> askLlm(
   try {
     final response = await httpClient
         .post(
-          Uri.parse(groqUrl),
+          Uri.parse(openRouterUrl),
           headers: {
-            'Authorization': 'Bearer $groqApiKey',
+            'Authorization': 'Bearer $openRouterApiKey',
             'Content-Type': 'application/json',
           },
           body: jsonEncode(body),

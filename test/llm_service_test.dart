@@ -69,7 +69,7 @@ void main() {
 
     await readTaskFromPrompt('Gym 3x', now: now, client: client);
 
-    expect(sent['model'], groqModel);
+    expect(sent['model'], llmModel);
     expect(sent['response_format'], {'type': 'json_object'});
     expect(sent['messages'][0]['content'], contains('Wednesday 2026-11-04'));
     expect(sent['messages'][1]['content'], 'Gym 3x');

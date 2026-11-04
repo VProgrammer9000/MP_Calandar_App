@@ -4,7 +4,7 @@ Chrono - a calendar app with a scheduling assistant. Group project for Mobile Pr
 
 ## How to run
 
-The assistant uses the Groq API, so you need a free key from https://console.groq.com/keys
+The assistant uses the OpenRouter API with its free models, so you need a key from https://openrouter.ai/settings/keys
 
 1. Copy `.env.example` to `.env` (git ignores this file, never commit your key)
 2. Put your key in `.env`

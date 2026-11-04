@@ -1,0 +1,137 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+import '../models/task_draft.dart';
+import '../models/task_label.dart';
+import '../utils/dates.dart';
+
+// The key comes from the .env file when the app is started, see the README.
+// Never write the key in the code because the repo is public.
+const groqApiKey = String.fromEnvironment('GROQ_API_KEY');
+const groqUrl = 'https://api.groq.com/openai/v1/chat/completions';
+// Groq removes old models sometimes, see console.groq.com/docs/models
+const groqModel = 'openai/gpt-oss-20b';
+
+// Has a message that is ok to show to the user
+class LlmException implements Exception {
+  final String message;
+
+  LlmException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+// Sends the messages to the LLM and gives back the text of its answer.
+// A client can be passed in so the tests don't call the real API.
+Future<String> askLlm(
+  List<Map<String, String>> messages, {
+  bool wantJson = false,
+  http.Client? client,
+}) async {
+  if (client == null && groqApiKey.isEmpty) {
+    throw LlmException('The API key is missing. See the README.');
+  }
+
+  final body = <String, dynamic>{
+    'model': groqModel,
+    'messages': messages,
+    'temperature': 0.2,
+  };
+  if (wantJson) {
+    body['response_format'] = {'type': 'json_object'};
+  }
+
+  final httpClient = client ?? http.Client();
+  try {
+    final response = await httpClient
+        .post(
+          Uri.parse(groqUrl),
+          headers: {
+            'Authorization': 'Bearer $groqApiKey',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 401) {
+      throw LlmException('The API key is not valid.');
+    }
+    if (response.statusCode == 429) {
+      throw LlmException('Too many requests. Try again in a minute.');
+    }
+    if (response.statusCode != 200) {
+      throw LlmException('The assistant had a problem '
+          '(error ${response.statusCode}). Try again.');
+    }
+
+    // bodyBytes so letters like æ or Korean are read correctly
+    final data = jsonDecode(utf8.decode(response.bodyBytes));
+    return data['choices'][0]['message']['content'];
+  } on LlmException {
+    rethrow;
+  } catch (e) {
+    throw LlmException('Could not reach the assistant. '
+        'Check your internet connection.');
+  } finally {
+    if (client == null) {
+      httpClient.close();
+    }
+  }
+}
+
+// Asks the LLM to pick out the task details from what the user wrote
+Future<TaskDraft> readTaskFromPrompt(
+  String prompt, {
+  DateTime? now,
+  http.Client? client,
+}) async {
+  final answer = await askLlm(
+    [
+      {'role': 'system', 'content': buildReadTaskPrompt(now ?? DateTime.now())},
+      {'role': 'user', 'content': prompt},
+    ],
+    wantJson: true,
+    client: client,
+  );
+
+  try {
+    return TaskDraft.fromJson(jsonDecode(answer));
+  } catch (e) {
+    throw LlmException(
+        'Could not understand that. Try writing it differently.');
+  }
+}
+
+String buildReadTaskPrompt(DateTime now) {
+  final weekday = weekdayNames[now.weekday - 1];
+  final today = '${now.year}-${twoDigits(now.month)}-${twoDigits(now.day)}';
+  final labels = defaultLabels.map((label) => label.name).join(', ');
+
+  return '''
+You read a task that a user wrote for their calendar app.
+Today is $weekday $today and the time is ${formatTime(now)}.
+
+Respond only with JSON with exactly these keys:
+- "title": short name of the task, as a string
+- "length_minutes": total time for the whole task as a number, null if not said
+- "split_minutes": length of one block as a number, null if not said
+- "earliest_start": when it can start at the earliest, null if not said
+- "deadline": when it must be done, null if not said
+- "label": one of $labels, null if none fits
+- "fixed": true only if the user gave an exact time, otherwise false
+- "priority": "high", "normal" or "low"
+
+Write dates as local time like 2026-01-31T14:00, without a time zone.
+
+Rules:
+- "before Friday" means the deadline is the start of that Friday, at 00:00.
+- "by Friday" means the deadline is the end of that Friday, at 23:59.
+- "this week" means the deadline is the coming Sunday at 23:59.
+- Repeated tasks like "Gym 3x" are 3 blocks. Use one hour per block if the time
+  is not said, so split_minutes is 60 and length_minutes is 180.
+- If the task is at an exact time, put that time in earliest_start.
+''';
+}

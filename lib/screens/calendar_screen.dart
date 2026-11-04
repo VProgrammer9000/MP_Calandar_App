@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../data/sample_data.dart';
 import '../models/calendar_event.dart';
+import '../models/task.dart';
+import '../models/task_draft.dart';
 import '../utils/dates.dart';
 import '../widgets/calendar_pager.dart';
 import '../widgets/day_timeline.dart';
@@ -70,7 +72,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   // TODO: load the user's events, sample events for now
-  final List<CalendarEvent> _events = sampleEvents();
+  final List<CalendarEvent> _events = myEvents;
 
   // TODO: filled in by the smart rescheduler, banner is hidden while null
   String? _rescheduleMessage;
@@ -106,6 +108,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
         );
       },
     );
+  }
+
+  Future<void> _openAddTask() async {
+    final draft = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddTaskScreen()),
+    );
+    // setState also when nothing came back, new blocks can be in myEvents
+    setState(() {
+      if (draft is TaskDraft) {
+        myTasks.insert(0, Task.fromDraft(draft));
+      }
+    });
   }
 
   void _deleteEvent(CalendarEvent event) {
@@ -152,12 +167,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         shape: const RoundedRectangleBorder(),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddTaskScreen()),
-          );
-        },
+        onPressed: _openAddTask,
         child: const Icon(Icons.add),
       ),
     );

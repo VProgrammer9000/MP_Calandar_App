@@ -9,6 +9,9 @@ import '../utils/dates.dart';
 // The task list is kept here so it stays the same when you switch tabs
 final List<Task> myTasks = sampleTasks();
 
+// Same for the calendar, and so the add page can put new blocks in it
+final List<CalendarEvent> myEvents = sampleEvents();
+
 List<Task> sampleTasks() {
   final today = dateOnly(DateTime.now());
 

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
+import '../data/sample_data.dart';
 import '../models/calendar_event.dart';
 import '../models/task_draft.dart';
+import '../services/llm_service.dart';
 import '../utils/dates.dart';
+import '../utils/slot_finder.dart';
 
 const _examplePrompts = [
   'Study 6h before Friday',
@@ -23,7 +27,10 @@ final _blackButtonStyle = TextButton.styleFrom(
 // 1g: the user describes the task in their own words, the assistant reads it
 // and proposes time slots that can be added to the calendar
 class AddByPrompt extends StatefulWidget {
-  const AddByPrompt({super.key});
+  // only used by the tests, so they don't call the real API
+  final http.Client? client;
+
+  const AddByPrompt({super.key, this.client});
 
   @override
   State<AddByPrompt> createState() => _AddByPromptState();
@@ -32,10 +39,12 @@ class AddByPrompt extends StatefulWidget {
 class _AddByPromptState extends State<AddByPrompt> {
   final _promptController = TextEditingController();
 
-  // TODO: filled in by the assistant, the result sections are hidden while null
+  // filled in by the assistant, the result sections are hidden while null
   TaskDraft? _readTask;
   final List<CalendarEvent> _proposedSlots = [];
   final Set<int> _pickedSlots = {};
+  bool _loading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -43,15 +52,61 @@ class _AddByPromptState extends State<AddByPrompt> {
     super.dispose();
   }
 
-  void _readPrompt() {
-    if (_promptController.text.trim().isEmpty) return;
+  Future<void> _readPrompt() async {
+    final prompt = _promptController.text.trim();
+    if (prompt.isEmpty) return;
     FocusScope.of(context).unfocus();
-    // TODO: send the prompt to the LLM and fill _readTask and _proposedSlots
+
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+      _readTask = null;
+      _proposedSlots.clear();
+      _pickedSlots.clear();
+    });
+
+    try {
+      final task = await readTaskFromPrompt(prompt, client: widget.client);
+      final slots = findSlots(task, myEvents, DateTime.now());
+      if (!mounted) return;
+      setState(() {
+        _readTask = task;
+        _proposedSlots.addAll(slots);
+        // all of them are picked at first, the user can remove some
+        _pickedSlots.addAll(List.generate(slots.length, (i) => i));
+      });
+    } on LlmException catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   void _addPickedSlots() {
-    // TODO: save the picked slots as events in the calendar
-    Navigator.pop(context);
+    for (final index in _pickedSlots) {
+      myEvents.add(_proposedSlots[index]);
+    }
+    // the page that opened this adds the task to the task list
+    Navigator.pop(context, _readTask);
+  }
+
+  // shown when the blocks don't add up to the whole task
+  String? _slotWarning() {
+    if (_proposedSlots.isEmpty) {
+      return 'No free time found before the deadline.';
+    }
+    var foundMinutes = 0;
+    for (final slot in _proposedSlots) {
+      foundMinutes += slot.end.difference(slot.start).inMinutes;
+    }
+    final neededMinutes = _readTask!.length?.inMinutes ?? 60;
+    if (foundMinutes < neededMinutes) {
+      return 'Only found ${formatDuration(Duration(minutes: foundMinutes))} '
+          'of ${formatDuration(Duration(minutes: neededMinutes))} '
+          'before the deadline.';
+    }
+    return null;
   }
 
   @override
@@ -101,9 +156,13 @@ class _AddByPromptState extends State<AddByPrompt> {
         const SizedBox(height: 16),
         TextButton(
           style: _blackButtonStyle,
-          onPressed: _readPrompt,
-          child: const Text('Read it & find slots'),
+          onPressed: _loading ? null : _readPrompt,
+          child: Text(_loading ? 'Reading...' : 'Read it & find slots'),
         ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 12),
+          Text(_errorMessage!, style: TextStyle(color: Colors.red.shade700)),
+        ],
         if (_readTask != null) ...[
           const SizedBox(height: 20),
           const Divider(height: 2, thickness: 2, color: Colors.black),
@@ -124,6 +183,10 @@ class _AddByPromptState extends State<AddByPrompt> {
           _buildSectionTitle('PROPOSED SLOTS'),
           for (var i = 0; i < _proposedSlots.length; i++)
             _buildSlotRow(i, _proposedSlots[i]),
+          if (_slotWarning() != null) ...[
+            const SizedBox(height: 12),
+            Text(_slotWarning()!, style: TextStyle(color: Colors.red.shade700)),
+          ],
           const SizedBox(height: 16),
           const Divider(height: 2, thickness: 2, color: Colors.black),
           const SizedBox(height: 16),

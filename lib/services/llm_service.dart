@@ -42,6 +42,8 @@ Future<String> askLlm(
   };
   if (wantJson) {
     body['response_format'] = {'type': 'json_object'};
+    // only use a free model that can do this
+    body['provider'] = {'require_parameters': true};
   }
 
   final httpClient = client ?? http.Client();

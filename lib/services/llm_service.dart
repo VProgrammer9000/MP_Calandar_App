@@ -72,7 +72,15 @@ Future<String> askLlm(
 
     // bodyBytes so letters like æ or Korean are read correctly
     final data = jsonDecode(utf8.decode(response.bodyBytes));
-    return data['choices'][0]['message']['content'];
+    // free models sometimes fail with an empty answer
+    final choices = data['choices'];
+    final content = choices is List && choices.isNotEmpty
+        ? choices[0]['message']['content']
+        : null;
+    if (content is! String || content.trim().isEmpty) {
+      throw LlmException('The assistant did not answer. Try again.');
+    }
+    return content;
   } on LlmException {
     rethrow;
   } catch (e) {

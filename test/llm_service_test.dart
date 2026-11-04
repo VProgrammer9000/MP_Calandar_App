@@ -75,6 +75,19 @@ void main() {
     expect(sent['messages'][1]['content'], 'Gym 3x');
   });
 
+  test('an empty answer gives a message for the user', () async {
+    expect(
+      askLlm([], client: fakeLlm('')),
+      throwsA(
+        isA<LlmException>().having(
+          (e) => e.message,
+          'message',
+          contains('did not answer'),
+        ),
+      ),
+    );
+  });
+
   test('ignores values that make no sense', () async {
     final answer = jsonEncode({
       'title': 'Gym',

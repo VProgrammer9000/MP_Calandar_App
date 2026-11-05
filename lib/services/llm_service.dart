@@ -109,7 +109,10 @@ Future<TaskDraft> readTaskFromPrompt(
   );
 
   try {
-    return TaskDraft.fromJson(jsonDecode(answer));
+    // some models put text around the JSON even if we ask them not to
+    final json =
+        answer.substring(answer.indexOf('{'), answer.lastIndexOf('}') + 1);
+    return TaskDraft.fromJson(jsonDecode(json));
   } catch (e) {
     throw LlmException(
         'Could not understand that. Try writing it differently.');

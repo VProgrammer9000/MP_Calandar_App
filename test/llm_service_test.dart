@@ -75,6 +75,15 @@ void main() {
     expect(sent['messages'][1]['content'], 'Gym 3x');
   });
 
+  test('finds the JSON if the model writes text around it', () async {
+    final task = await readTaskFromPrompt(
+      'Gym',
+      now: now,
+      client: fakeLlm('Here it is:\n```json\n{"title":"Gym"}\n```'),
+    );
+    expect(task.title, 'Gym');
+  });
+
   test('an empty answer gives a message for the user', () async {
     expect(
       askLlm([], client: fakeLlm('')),

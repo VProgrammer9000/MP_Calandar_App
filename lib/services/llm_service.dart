@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -48,6 +49,7 @@ Future<String> askLlm(
 
   final httpClient = client ?? http.Client();
   try {
+    // free models can be slow, some answers took over 20 seconds when we tried
     final response = await httpClient
         .post(
           Uri.parse(openRouterUrl),
@@ -57,13 +59,13 @@ Future<String> askLlm(
           },
           body: jsonEncode(body),
         )
-        .timeout(const Duration(seconds: 30));
+        .timeout(const Duration(seconds: 60));
 
     if (response.statusCode == 401) {
       throw LlmException('The API key is not valid.');
     }
     if (response.statusCode == 429) {
-      throw LlmException('Too many requests. Try again in a minute.');
+      throw LlmException('Too many requests. Try again later.');
     }
     if (response.statusCode != 200) {
       throw LlmException('The assistant had a problem '
@@ -83,6 +85,8 @@ Future<String> askLlm(
     return content;
   } on LlmException {
     rethrow;
+  } on TimeoutException {
+    throw LlmException('The assistant took too long. Try again.');
   } catch (e) {
     throw LlmException('Could not reach the assistant. '
         'Check your internet connection.');

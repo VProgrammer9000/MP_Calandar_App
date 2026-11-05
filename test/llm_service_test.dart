@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:chrono/models/task_draft.dart';
@@ -158,6 +159,24 @@ void main() {
           (e) => e.message,
           'message',
           contains('internet'),
+        ),
+      ),
+    );
+  });
+
+  test('a timeout has its own message and does not blame the internet',
+      () async {
+    final client = MockClient((request) async {
+      throw TimeoutException('too slow');
+    });
+
+    expect(
+      askLlm([], client: client),
+      throwsA(
+        isA<LlmException>().having(
+          (e) => e.message,
+          'message',
+          contains('took too long'),
         ),
       ),
     );

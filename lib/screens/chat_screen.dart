@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../data/sample_data.dart';
+import '../models/calendar_change.dart';
 import '../services/chat_service.dart';
 import '../services/llm_service.dart';
+import '../utils/dates.dart';
 
 enum AssistantMode { quickReply, planChanges }
 
@@ -76,9 +78,9 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _openPreview() {
+  void _openPreview(ChatPlan plan) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const ChangePreviewScreen()),
+      MaterialPageRoute<void>(builder: (_) => ChangePreviewScreen(plan: plan)),
     );
   }
 
@@ -103,7 +105,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       text: message.text,
                       isUser: message.isUser,
                       showReviewButton: message.showReview,
-                      onReviewChanges: _openPreview,
+                      onReviewChanges: () => _openPreview(message.plan!),
                     ),
                   if (_loading)
                     const _ChatBubble(text: 'Thinking...', isUser: false),
@@ -265,7 +267,9 @@ class _Composer extends StatelessWidget {
 }
 
 class ChangePreviewScreen extends StatefulWidget {
-  const ChangePreviewScreen({super.key});
+  final ChatPlan plan;
+
+  const ChangePreviewScreen({super.key, required this.plan});
 
   @override
   State<ChangePreviewScreen> createState() => _ChangePreviewScreenState();
@@ -299,17 +303,22 @@ class _ChangePreviewScreenState extends State<ChangePreviewScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                 children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: _LabelChip(
-                      text: 'Demo preview',
-                      color: Colors.red.shade700,
+                  if (widget.plan.skipped > 0) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: _LabelChip(
+                        text: '${widget.plan.skipped} '
+                            '${widget.plan.skipped == 1 ? 'change' : 'changes'}'
+                            ' left out',
+                        color: Colors.red.shade700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    '1 added · 1 adjusted · 1 deleted',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+                    const SizedBox(height: 14),
+                  ],
+                  Text(
+                    _summary(widget.plan.changes),
+                    style: const TextStyle(
+                        fontSize: 22, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 14),
                   const _Legend(),
@@ -341,7 +350,7 @@ class _ChangePreviewScreenState extends State<ChangePreviewScreen> {
                   if (_tab == PreviewTab.calendar)
                     _WeekPreview(secondPreview: _secondPreview)
                   else
-                    _ChangesList(secondPreview: _secondPreview),
+                    _ChangesList(changes: widget.plan.changes),
                   const SizedBox(height: 20),
                   _FurtherChanges(
                     controller: _messageController,
@@ -629,34 +638,49 @@ class _PreviewEvent extends StatelessWidget {
   }
 }
 
-class _ChangesList extends StatelessWidget {
-  final bool secondPreview;
+// e.g. "1 added · 1 adjusted · 0 deleted"
+String _summary(List<CalendarChange> changes) {
+  int count(ChangeType type) => changes.where((c) => c.type == type).length;
+  return '${count(ChangeType.add)} added · '
+      '${count(ChangeType.move)} adjusted · '
+      '${count(ChangeType.delete)} deleted';
+}
 
-  const _ChangesList({required this.secondPreview});
+// e.g. "Wed 11 Nov 13:00–14:00"
+String _timeRange(DateTime start, DateTime end) =>
+    '${formatShortDate(start)} ${formatTime(start)}–${formatTime(end)}';
+
+class _ChangesList extends StatelessWidget {
+  final List<CalendarChange> changes;
+
+  const _ChangesList({required this.changes});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _ChangeCard(
-          label: 'ADDED',
-          title: 'Study session',
-          details:
-              secondPreview ? 'Thursday 16:00–17:00' : 'Thursday 14:00–15:00',
-          color: const Color(0xff2e7d32),
-        ),
-        _ChangeCard(
-          label: 'ADJUSTED',
-          title: 'Workout',
-          details: 'Tuesday, 18:00–19:00 → 19:00–20:00',
-          color: const Color(0xff1565c0),
-        ),
-        _ChangeCard(
-          label: 'DELETED',
-          title: 'Study group',
-          details: 'Wednesday 15:00–16:00',
-          color: const Color(0xffc62828),
-        ),
+        for (final change in changes)
+          switch (change.type) {
+            ChangeType.add => _ChangeCard(
+                label: 'ADDED',
+                title: change.title,
+                details: _timeRange(change.start!, change.end!),
+                color: const Color(0xff2e7d32),
+              ),
+            ChangeType.move => _ChangeCard(
+                label: 'ADJUSTED',
+                title: change.title,
+                details: '${_timeRange(change.event!.start, change.event!.end)}'
+                    ' → ${_timeRange(change.start!, change.end!)}',
+                color: const Color(0xff1565c0),
+              ),
+            ChangeType.delete => _ChangeCard(
+                label: 'DELETED',
+                title: change.title,
+                details: _timeRange(change.event!.start, change.event!.end),
+                color: const Color(0xffc62828),
+              ),
+          },
       ],
     );
   }

@@ -69,6 +69,40 @@ void main() {
     expect(find.text('Review changes'), findsOneWidget);
   });
 
+  testWidgets('the review page lists the changes from the assistant',
+      (tester) async {
+    final plan = {
+      'reply': 'Done',
+      'changes': [
+        {
+          'type': 'add',
+          'title': 'Important meeting',
+          'start': '2026-11-11T13:00',
+          'end': '2026-11-11T14:00',
+        },
+        {'type': 'delete', 'event': 0},
+        {'type': 'delete', 'event': 999},
+      ],
+    };
+    await tester.pumpWidget(
+      MaterialApp(home: ChatScreen(client: fakeLlm(plan))),
+    );
+
+    await tester.tap(find.text('Plan changes'));
+    await send(tester, 'Make room for a meeting');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Review changes'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Changes list'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 added · 0 adjusted · 1 deleted'), findsOneWidget);
+    expect(find.text('1 change left out'.toUpperCase()), findsOneWidget);
+    expect(find.text('Important meeting'), findsOneWidget);
+    expect(find.text('Wed 11 Nov 13:00–14:00'), findsOneWidget);
+    expect(find.text('DELETED'), findsOneWidget);
+  });
+
   testWidgets('no review button when nothing changes', (tester) async {
     final plan = {'reply': 'The gym is at 18:00.', 'changes': []};
     await tester.pumpWidget(

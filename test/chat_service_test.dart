@@ -96,6 +96,71 @@ void main() {
     expect(sent['messages'][1]['content'], 'Hi');
   });
 
+  test('sends the earlier messages between the prompt and the new one',
+      () async {
+    late Map<String, dynamic> sent;
+    final client = MockClient((request) async {
+      sent = jsonDecode(request.body);
+      return http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {'content': '{"reply":"Ok"}'},
+            },
+          ],
+        }),
+        200,
+      );
+    });
+
+    await planChanges(
+      'Actually make it 15:00',
+      events,
+      history: [
+        {'role': 'user', 'content': 'Add a meeting at 13'},
+        {'role': 'assistant', 'content': 'I added it at 13:00.'},
+      ],
+      now: now,
+      client: client,
+    );
+
+    final messages = sent['messages'] as List;
+    expect(messages.map((m) => m['role']),
+        ['system', 'user', 'assistant', 'user']);
+    expect(messages[1]['content'], 'Add a meeting at 13');
+    expect(messages[2]['content'], 'I added it at 13:00.');
+    expect(messages[3]['content'], 'Actually make it 15:00');
+  });
+
+  test('only sends the last messages of a long chat', () async {
+    late Map<String, dynamic> sent;
+    final client = MockClient((request) async {
+      sent = jsonDecode(request.body);
+      return http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {'content': '{"reply":"Ok"}'},
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final history = [
+      for (var i = 0; i < 30; i++) {'role': 'user', 'content': 'message $i'},
+    ];
+
+    await planChanges('new', events,
+        history: history, now: now, client: client);
+
+    final messages = sent['messages'] as List;
+    // the prompt, the last messages and the new one
+    expect(messages.length, maxHistory + 2);
+    expect(messages[1]['content'], 'message 20');
+    expect(messages.last['content'], 'new');
+  });
+
   test('a question gives a reply and no changes', () async {
     final plan = await planChanges('When is the gym?', events,
         now: now, client: fakeLlm('{"reply":"Tuesday at 18:00"}'));

@@ -21,20 +21,30 @@ class ChatPlan {
   });
 }
 
+// Only this many earlier messages are sent, so the request doesn't get huge
+const maxHistory = 10;
+
 // Asks the LLM what to change in the calendar for the user's message.
 // The events are numbered in the prompt, and the changes point back to them.
+// The history is the chat so far, so the LLM knows what "it" or "that" means.
 Future<ChatPlan> planChanges(
   String message,
   List<CalendarEvent> events, {
+  List<Map<String, String>> history = const [],
   DateTime? now,
   http.Client? client,
 }) async {
+  final recent = history.length > maxHistory
+      ? history.sublist(history.length - maxHistory)
+      : history;
+
   final answer = await askLlm(
     [
       {
         'role': 'system',
         'content': buildPlanPrompt(now ?? DateTime.now(), events),
       },
+      ...recent,
       {'role': 'user', 'content': message},
     ],
     wantJson: true,

@@ -78,10 +78,18 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _openPreview(ChatPlan plan) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => ChangePreviewScreen(plan: plan)),
+  Future<void> _openPreview(_Message message) async {
+    final accepted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+          builder: (_) => ChangePreviewScreen(plan: message.plan!)),
     );
+    // null means the user went back without deciding
+    if (accepted == null || !mounted) return;
+    // a plan can only be accepted or rejected once
+    setState(() {
+      final index = _messages.indexOf(message);
+      _messages[index] = _Message(message.text, plan: message.plan);
+    });
   }
 
   @override
@@ -105,7 +113,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       text: message.text,
                       isUser: message.isUser,
                       showReviewButton: message.showReview,
-                      onReviewChanges: () => _openPreview(message.plan!),
+                      onReviewChanges: () => _openPreview(message),
                     ),
                   if (_loading)
                     const _ChatBubble(text: 'Thinking...', isUser: false),
@@ -286,10 +294,16 @@ class _ChangePreviewScreenState extends State<ChangePreviewScreen> {
     super.dispose();
   }
 
-  void _finish(String message) {
+  // goes back to the chat and tells it if the changes were accepted
+  void _finish(bool accepted) {
+    if (accepted) applyChanges(widget.plan.changes, myEvents);
     final messenger = ScaffoldMessenger.of(context);
-    Navigator.of(context).pop();
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+    Navigator.of(context).pop(accepted);
+    messenger.showSnackBar(SnackBar(
+      content: Text(accepted
+          ? 'The changes are in your calendar.'
+          : 'Nothing was changed.'),
+    ));
   }
 
   @override
@@ -365,8 +379,7 @@ class _ChangePreviewScreenState extends State<ChangePreviewScreen> {
                 children: [
                   Expanded(
                     child: FilledButton(
-                      onPressed: () =>
-                          _finish('Demo accepted — no calendar data changed.'),
+                      onPressed: () => _finish(true),
                       style: FilledButton.styleFrom(
                         backgroundColor: Colors.black,
                         foregroundColor: Colors.white,
@@ -378,8 +391,7 @@ class _ChangePreviewScreenState extends State<ChangePreviewScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () =>
-                          _finish('Demo rejected — no calendar data changed.'),
+                      onPressed: () => _finish(false),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.black,
                         side: const BorderSide(color: Colors.black),

@@ -67,6 +67,49 @@ void main() {
     );
   });
 
+  test('applies an add, a move and a delete', () {
+    final list = [...events];
+    final changes = [
+      CalendarChange.fromJson({
+        'type': 'add',
+        'title': 'Study session',
+        'start': '2026-11-12T14:00',
+        'end': '2026-11-12T15:00',
+      }, list),
+      CalendarChange.fromJson({
+        'type': 'move',
+        'event': 0,
+        'start': '2026-11-10T19:00',
+        'end': '2026-11-10T20:00',
+      }, list),
+      CalendarChange.fromJson({'type': 'delete', 'event': 1}, list),
+    ];
+
+    applyChanges(changes, list);
+
+    expect(list.map((e) => e.title), ['Gym', 'Study session']);
+    expect(list[0].start, DateTime(2026, 11, 10, 19));
+    expect(list[0].end, DateTime(2026, 11, 10, 20));
+    expect(list[1].start, DateTime(2026, 11, 12, 14));
+    // the list the test started with is not touched
+    expect(events.length, 2);
+  });
+
+  test('skips changes to events that are gone', () {
+    final list = [...events];
+    final move = CalendarChange.fromJson({
+      'type': 'move',
+      'event': 0,
+      'start': '2026-11-10T19:00',
+      'end': '2026-11-10T20:00',
+    }, list);
+    list.removeAt(0);
+
+    applyChanges([move], list);
+
+    expect(list.map((e) => e.title), ['Algorithms class']);
+  });
+
   test('throws on answers that make no sense', () {
     final bad = <Map<String, dynamic>>[
       {'type': 'rename', 'event': 0},

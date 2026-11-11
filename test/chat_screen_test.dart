@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:chrono/data/sample_data.dart';
 import 'package:chrono/screens/chat_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -101,6 +102,64 @@ void main() {
     expect(find.text('Important meeting'), findsOneWidget);
     expect(find.text('Wed 11 Nov 13:00–14:00'), findsOneWidget);
     expect(find.text('DELETED'), findsOneWidget);
+  });
+
+  group('accept and reject', () {
+    final addPlan = {
+      'reply': 'Added it',
+      'changes': [
+        {
+          'type': 'add',
+          'title': 'Important meeting',
+          'start': '2026-11-11T13:00',
+          'end': '2026-11-11T14:00',
+        },
+      ],
+    };
+
+    // opens the review page for the add plan, and puts the calendar back after
+    Future<void> openReview(WidgetTester tester) async {
+      final before = [...myEvents];
+      addTearDown(() => myEvents
+        ..clear()
+        ..addAll(before));
+
+      await tester.pumpWidget(
+        MaterialApp(home: ChatScreen(client: fakeLlm(addPlan))),
+      );
+      await tester.tap(find.text('Plan changes'));
+      await send(tester, 'Add a meeting');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Review changes'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('accept puts the changes in the calendar', (tester) async {
+      await openReview(tester);
+      final count = myEvents.length;
+
+      await tester.tap(find.text('Accept changes'));
+      await tester.pumpAndSettle();
+
+      expect(myEvents.length, count + 1);
+      expect(myEvents.last.title, 'Important meeting');
+      expect(find.text('The changes are in your calendar.'), findsOneWidget);
+      // back in the chat, and the plan can't be used again
+      expect(find.text('Added it'), findsOneWidget);
+      expect(find.text('Review changes'), findsNothing);
+    });
+
+    testWidgets('reject changes nothing', (tester) async {
+      await openReview(tester);
+      final before = [...myEvents];
+
+      await tester.tap(find.text('Reject changes'));
+      await tester.pumpAndSettle();
+
+      expect(myEvents, before);
+      expect(find.text('Nothing was changed.'), findsOneWidget);
+      expect(find.text('Review changes'), findsNothing);
+    });
   });
 
   testWidgets('no review button when nothing changes', (tester) async {

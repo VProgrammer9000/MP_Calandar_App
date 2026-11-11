@@ -87,3 +87,35 @@ class CalendarChange {
     return DateTime.tryParse(value)?.toLocal();
   }
 }
+
+// Makes the changes in the list of events. A change is skipped if its event
+// is not in the list anymore, e.g. when it was deleted in the calendar after
+// the assistant answered.
+void applyChanges(List<CalendarChange> changes, List<CalendarEvent> events) {
+  for (final change in changes) {
+    switch (change.type) {
+      case ChangeType.add:
+        events.add(CalendarEvent(
+          title: change.title,
+          start: change.start!,
+          end: change.end!,
+        ));
+      case ChangeType.move:
+        final old = change.event!;
+        final index = events.indexOf(old);
+        if (index == -1) continue;
+        events[index] = CalendarEvent(
+          title: old.title,
+          start: change.start!,
+          end: change.end!,
+          fixed: old.fixed,
+          label: old.label,
+          priority: old.priority,
+          windowStart: old.windowStart,
+          windowEnd: old.windowEnd,
+        );
+      case ChangeType.delete:
+        events.remove(change.event);
+    }
+  }
+}

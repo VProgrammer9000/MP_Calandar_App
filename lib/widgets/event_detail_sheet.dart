@@ -119,7 +119,11 @@ class _EventDetailSheetState extends State<EventDetailSheet> {
 
   void save() {
     widget.onSave(CalendarEvent(
+      id: widget.event.id,
+      taskId: widget.event.taskId,
       title: widget.event.title,
+      description: widget.event.description,
+      location: widget.event.location,
       start: start,
       end: end,
       fixed: widget.event.fixed,
@@ -222,6 +226,8 @@ class _EventDetailSheetState extends State<EventDetailSheet> {
                   child: Text(windowText),
                 ),
               ),
+              if (event.location != null && event.location!.isNotEmpty)
+                buildRow('location', Text(event.location!)),
               buildRow(
                 'priority',
                 DropdownButton<Priority>(

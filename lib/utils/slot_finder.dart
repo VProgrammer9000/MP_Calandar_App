@@ -18,12 +18,13 @@ List<CalendarEvent> findSlots(
   List<CalendarEvent> events,
   DateTime now,
 ) {
+  final taskId = task.id ?? newModelId('task');
   final totalMinutes = task.length?.inMinutes ?? 60;
 
   // A fixed task with a time stays at that time
   if (task.fixed && task.earliestStart != null) {
     final start = task.earliestStart!;
-    return [_makeBlock(task, start, totalMinutes)];
+    return [_makeBlock(task, taskId, start, totalMinutes)];
   }
 
   final blockMinutes =
@@ -55,7 +56,7 @@ List<CalendarEvent> findSlots(
         final minutes = blocks[slots.length];
         final start = _findFreeTime(day, minutes, busy, searchStart, searchEnd);
         if (start != null) {
-          final slot = _makeBlock(task, start, minutes);
+          final slot = _makeBlock(task, taskId, start, minutes);
           slots.add(slot);
           busy.add(slot);
           usedDays.add(day);
@@ -105,16 +106,20 @@ DateTime? _findFreeTime(
   return time.add(length).isAfter(dayEnd) ? null : time;
 }
 
-CalendarEvent _makeBlock(TaskDraft task, DateTime start, int minutes) {
+CalendarEvent _makeBlock(
+    TaskDraft task, String taskId, DateTime start, int minutes) {
   return CalendarEvent(
+    taskId: taskId,
     title: task.title,
+    description: task.description,
+    location: task.location,
     start: start,
     end: start.add(Duration(minutes: minutes)),
     fixed: task.fixed,
     label: task.label,
     priority: task.priority,
-    windowStart: task.fixed ? null : task.earliestStart,
-    windowEnd: task.fixed ? null : task.deadline,
+    windowStart: task.earliestStart,
+    windowEnd: task.deadline,
   );
 }
 

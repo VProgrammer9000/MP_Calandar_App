@@ -29,7 +29,6 @@ final _blackButtonStyle = TextButton.styleFrom(
 class AddByPrompt extends StatefulWidget {
   // only used by the tests, so they don't call the real API
   final http.Client? client;
-
   const AddByPrompt({super.key, this.client});
 
   @override
@@ -67,10 +66,12 @@ class _AddByPromptState extends State<AddByPrompt> {
 
     try {
       final task = await readTaskFromPrompt(prompt, client: widget.client);
-      final slots = findSlots(task, myEvents, DateTime.now());
+      final taskWithId =
+          task.id == null ? task.withId(newModelId('task')) : task;
+      final slots = findSlots(taskWithId, myEvents, DateTime.now());
       if (!mounted) return;
       setState(() {
-        _readTask = task;
+        _readTask = taskWithId;
         _proposedSlots.addAll(slots);
         // all of them are picked at first, the user can remove some
         _pickedSlots.addAll(List.generate(slots.length, (i) => i));
@@ -87,7 +88,6 @@ class _AddByPromptState extends State<AddByPrompt> {
     for (final index in _pickedSlots) {
       myEvents.add(_proposedSlots[index]);
     }
-    // the page that opened this adds the task to the task list
     Navigator.pop(context, _readTask);
   }
 
@@ -180,6 +180,8 @@ class _AddByPromptState extends State<AddByPrompt> {
           ),
           _buildReadRow('type', _readTask!.fixed ? 'Fixed' : 'Flexible'),
           _buildReadRow('label', _readTask!.label ?? ''),
+          if (_readTask!.location != null)
+            _buildReadRow('location', _readTask!.location!),
           _buildSectionTitle('PROPOSED SLOTS'),
           for (var i = 0; i < _proposedSlots.length; i++)
             _buildSlotRow(i, _proposedSlots[i]),

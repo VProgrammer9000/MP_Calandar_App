@@ -9,7 +9,7 @@ import '../widgets/event_detail_sheet.dart';
 import '../widgets/month_grid.dart';
 import '../widgets/week_day_strip.dart';
 import '../widgets/week_timeline.dart';
-import 'add_event_screen.dart';
+import 'add_task_screen.dart';
 
 enum CalendarView { day, week, month }
 
@@ -112,12 +112,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const AddEventScreen(),
+        builder: (context) => const AddTaskScreen(type: AddType.event),
       ),
     );
     // The add screen updates myEvents in calendar mode.
-    setState(() {
-    });
+    setState(() {});
   }
 
   void _deleteEvent(CalendarEvent event) {

@@ -110,6 +110,29 @@ void main() {
     expect(list.map((e) => e.title), ['Algorithms class']);
   });
 
+  test('describes itself in one line', () {
+    final add = CalendarChange.fromJson({
+      'type': 'add',
+      'title': 'Meeting',
+      'start': '2026-11-12T13:00',
+      'end': '2026-11-12T14:00',
+    }, events);
+    final move = CalendarChange.fromJson({
+      'type': 'move',
+      'event': 0,
+      'start': '2026-11-10T19:00',
+      'end': '2026-11-10T20:00',
+    }, events);
+    final delete =
+        CalendarChange.fromJson({'type': 'delete', 'event': 1}, events);
+
+    expect(add.describe(), 'add "Meeting" Thu 12 Nov 13:00-14:00');
+    expect(move.describe(),
+        'move "Gym" from Tue 10 Nov 18:00-19:00 to Tue 10 Nov 19:00-20:00');
+    expect(
+        delete.describe(), 'delete "Algorithms class" Wed 11 Nov 10:00-12:00');
+  });
+
   test('throws on answers that make no sense', () {
     final bad = <Map<String, dynamic>>[
       {'type': 'rename', 'event': 0},

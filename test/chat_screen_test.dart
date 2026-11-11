@@ -233,6 +233,60 @@ void main() {
     });
   });
 
+  testWidgets('a follow-up is sent with the chat so far', (tester) async {
+    final sent = <List<dynamic>>[];
+    var calls = 0;
+    final client = MockClient((request) async {
+      sent.add(jsonDecode(request.body)['messages']);
+      calls++;
+      // the second call fails, so its error should not be in the history
+      if (calls == 2) return http.Response('', 429);
+      final plan = {
+        'reply': 'Added the meeting',
+        'changes': [
+          {
+            'type': 'add',
+            'title': 'Meeting',
+            'start': '2026-11-11T13:00',
+            'end': '2026-11-11T14:00',
+          },
+        ],
+      };
+      return http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {'content': jsonEncode(plan)},
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    await tester.pumpWidget(MaterialApp(home: ChatScreen(client: client)));
+
+    await send(tester, 'Meeting at 13');
+    await tester.pumpAndSettle();
+    await send(tester, 'Hello?');
+    await tester.pumpAndSettle();
+    await send(tester, 'Actually it starts at 14');
+    await tester.pumpAndSettle();
+
+    // the first message is sent alone, after the prompt
+    expect(sent[0].length, 2);
+    // the third one has the chat before it, without the error
+    final third = sent[2];
+    expect(third.map((m) => m['role']),
+        ['system', 'user', 'assistant', 'user', 'user']);
+    expect(third[1]['content'], 'Meeting at 13');
+    expect(third[2]['content'], contains('Added the meeting'));
+    expect(third[2]['content'], contains('Not accepted yet'));
+    expect(third[2]['content'],
+        contains('- add "Meeting" Wed 11 Nov 13:00-14:00'));
+    expect(third[3]['content'], 'Hello?');
+    expect(third[4]['content'], 'Actually it starts at 14');
+  });
+
   testWidgets('no review button when nothing changes', (tester) async {
     final plan = {'reply': 'The gym is at 18:00.', 'changes': []};
     await tester.pumpWidget(

@@ -1,3 +1,4 @@
+import '../utils/dates.dart';
 import 'calendar_event.dart';
 
 enum ChangeType { add, move, delete }
@@ -65,6 +66,23 @@ class CalendarChange {
       end: end,
     );
   }
+
+  // One line for the chat history, so the LLM knows what it proposed before.
+  // e.g. 'move "Gym" from Wed 11 Nov 18:00-19:00 to Wed 11 Nov 19:00-20:00'
+  String describe() {
+    switch (type) {
+      case ChangeType.add:
+        return 'add "$title" ${_range(start!, end!)}';
+      case ChangeType.move:
+        return 'move "$title" from ${_range(event!.start, event!.end)} '
+            'to ${_range(start!, end!)}';
+      case ChangeType.delete:
+        return 'delete "$title" ${_range(event!.start, event!.end)}';
+    }
+  }
+
+  static String _range(DateTime start, DateTime end) =>
+      '${formatShortDate(start)} ${formatTime(start)}-${formatTime(end)}';
 
   static ChangeType _readType(dynamic value) {
     for (final type in ChangeType.values) {

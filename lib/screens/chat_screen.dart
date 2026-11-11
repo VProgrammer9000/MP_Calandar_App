@@ -29,13 +29,32 @@ class _Message {
   final ChatPlan? plan;
   // the review button is only shown if the user asked for planned changes
   final bool showReview;
+  // null until the user accepts or rejects the plan
+  final bool? accepted;
 
   const _Message(
     this.text, {
     this.isUser = false,
     this.plan,
     this.showReview = false,
+    this.accepted,
   });
+
+  // What the LLM gets to see of this message when the next one is sent.
+  // Errors are left out, they were never an answer from the LLM.
+  Map<String, String>? toHistory() {
+    if (isUser) return {'role': 'user', 'content': text};
+    if (plan == null) return null;
+    if (plan!.changes.isEmpty) return {'role': 'assistant', 'content': text};
+
+    final status = switch (accepted) {
+      true => 'The user accepted these, they are in the calendar now:',
+      false => 'The user rejected these, nothing was changed:',
+      null => 'Not accepted yet, so they are not in the calendar:',
+    };
+    final changes = plan!.changes.map((c) => '- ${c.describe()}').join('\n');
+    return {'role': 'assistant', 'content': '$text\n\n$status\n$changes'};
+  }
 }
 
 class _ChatScreenState extends State<ChatScreen> {
@@ -55,6 +74,11 @@ class _ChatScreenState extends State<ChatScreen> {
     if (message.isEmpty) return;
     // the mode can be changed while waiting, so remember the one it was sent in
     final wantsPlan = _mode == AssistantMode.planChanges;
+    // the chat so far, before the new message is added to it
+    final history = [
+      for (final m in _messages)
+        if (m.toHistory() != null) m.toHistory()!,
+    ];
     setState(() {
       _messages.add(_Message(message, isUser: true));
       _messageController.clear();
@@ -62,7 +86,8 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      final plan = await planChanges(message, myEvents, client: widget.client);
+      final plan = await planChanges(message, myEvents,
+          history: history, client: widget.client);
       if (!mounted) return;
       setState(() {
         _messages.add(_Message(
@@ -89,7 +114,8 @@ class _ChatScreenState extends State<ChatScreen> {
     // a plan can only be accepted or rejected once
     setState(() {
       final index = _messages.indexOf(message);
-      _messages[index] = _Message(message.text, plan: message.plan);
+      _messages[index] =
+          _Message(message.text, plan: message.plan, accepted: accepted);
     });
   }
 

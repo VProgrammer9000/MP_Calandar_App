@@ -507,6 +507,44 @@ List<_PreviewBlock> _previewBlocks(
   return blocks;
 }
 
+// Blocks that overlap on the same day are put next to each other. Gives each
+// block its lane and how many lanes its group of overlapping blocks has.
+Map<_PreviewBlock, (int, int)> _lanes(List<_PreviewBlock> blocks) {
+  final result = <_PreviewBlock, (int, int)>{};
+  final sorted = [...blocks]..sort((a, b) => a.start.compareTo(b.start));
+
+  // blocks in the group that is being filled, and where each lane ends
+  var group = <_PreviewBlock>[];
+  var laneEnds = <DateTime>[];
+  void closeGroup() {
+    for (final block in group) {
+      result[block] = (result[block]!.$1, laneEnds.length);
+    }
+    group = [];
+    laneEnds = [];
+  }
+
+  for (final block in sorted) {
+    final overlapsGroup = group.isNotEmpty &&
+        isSameDay(group.first.start, block.start) &&
+        laneEnds.any((end) => end.isAfter(block.start));
+    if (!overlapsGroup) closeGroup();
+
+    // the first lane that is free when this block starts
+    var lane = laneEnds.indexWhere((end) => !end.isAfter(block.start));
+    if (lane == -1) {
+      lane = laneEnds.length;
+      laneEnds.add(block.end);
+    } else {
+      laneEnds[lane] = block.end;
+    }
+    group.add(block);
+    result[block] = (lane, 0);
+  }
+  closeGroup();
+  return result;
+}
+
 const _hourHeight = 42.0;
 
 class _WeekPreview extends StatelessWidget {
@@ -532,6 +570,7 @@ class _WeekPreview extends StatelessWidget {
     }
     if (lastHour - firstHour < 3) lastHour = firstHour + 3;
     final hours = lastHour - firstHour;
+    final lanes = _lanes(blocks);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -600,6 +639,8 @@ class _WeekPreview extends StatelessWidget {
                           block: block,
                           column: days.indexOf(dateOnly(block.start)),
                           columnWidth: constraints.maxWidth / days.length,
+                          lane: lanes[block]!.$1,
+                          laneCount: lanes[block]!.$2,
                           firstHour: firstHour,
                         ),
                     ],
@@ -620,12 +661,17 @@ class _PreviewEvent extends StatelessWidget {
   final _PreviewBlock block;
   final int column;
   final double columnWidth;
+  // overlapping blocks share the column
+  final int lane;
+  final int laneCount;
   final int firstHour;
 
   const _PreviewEvent({
     required this.block,
     required this.column,
     required this.columnWidth,
+    required this.lane,
+    required this.laneCount,
     required this.firstHour,
   });
 
@@ -660,18 +706,21 @@ class _PreviewEvent extends StatelessWidget {
     final height =
         block.end.difference(block.start).inMinutes / 60 * _hourHeight;
 
+    final laneWidth = columnWidth / laneCount;
+
     return Positioned(
       top: top + 2,
-      left: column * columnWidth,
-      width: columnWidth,
+      left: column * columnWidth + lane * laneWidth,
+      width: laneWidth,
       height: height - 4,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 2),
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
+          // solid colors, so nothing shows through from behind
           color: block.type == _PreviewEventType.neutral
               ? Colors.grey.shade100
-              : _color.withValues(alpha: .12),
+              : Color.alphaBlend(_color.withValues(alpha: .12), Colors.white),
           border: Border.all(color: _color, width: 1.5),
         ),
         child: Text(

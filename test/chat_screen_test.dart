@@ -145,6 +145,36 @@ void main() {
     expect(find.text('09:00 Mobile Programming lecture'), findsOneWidget);
   });
 
+  testWidgets('blocks at the same time are next to each other', (tester) async {
+    final work = myEvents.indexWhere((e) => e.title == 'Work on Chrono app');
+    final start = myEvents[work].start;
+    String at(int hour) =>
+        DateTime(start.year, start.month, start.day, hour).toIso8601String();
+    // the assistant adds something on top of the work without moving it
+    final plan = {
+      'reply': 'Added it',
+      'changes': [
+        {'type': 'add', 'title': 'Call', 'start': at(13), 'end': at(14)},
+      ],
+    };
+    tester.view.physicalSize = const Size(400, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(home: ChatScreen(client: fakeLlm(plan))),
+    );
+    await tester.tap(find.text('Plan changes'));
+    await send(tester, 'Add a call');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Review changes'));
+    await tester.pumpAndSettle();
+
+    final call = tester.getRect(find.text('13:00 Call'));
+    final workRect = tester.getRect(find.text('13:00 Work on Chrono app'));
+    expect(call.overlaps(workRect), isFalse);
+  });
+
   group('accept and reject', () {
     final addPlan = {
       'reply': 'Added it',

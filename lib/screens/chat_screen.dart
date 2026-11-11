@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 
 import '../data/sample_data.dart';
 import '../models/calendar_change.dart';
+import '../models/calendar_event.dart';
 import '../services/chat_service.dart';
 import '../services/llm_service.dart';
 import '../utils/dates.dart';
@@ -286,7 +287,6 @@ class ChangePreviewScreen extends StatefulWidget {
 class _ChangePreviewScreenState extends State<ChangePreviewScreen> {
   final _messageController = TextEditingController();
   PreviewTab _tab = PreviewTab.calendar;
-  bool _secondPreview = false;
 
   @override
   void dispose() {
@@ -362,13 +362,15 @@ class _ChangePreviewScreenState extends State<ChangePreviewScreen> {
                   ),
                   const SizedBox(height: 16),
                   if (_tab == PreviewTab.calendar)
-                    _WeekPreview(secondPreview: _secondPreview)
+                    _WeekPreview(changes: widget.plan.changes)
                   else
                     _ChangesList(changes: widget.plan.changes),
                   const SizedBox(height: 20),
                   _FurtherChanges(
                     controller: _messageController,
-                    onPreview: () => setState(() => _secondPreview = true),
+                    onPreview: () {
+                      // TODO: send the further change to the assistant
+                    },
                   ),
                 ],
               ),
@@ -446,136 +448,166 @@ class _LegendItem extends StatelessWidget {
   }
 }
 
-class _WeekPreview extends StatelessWidget {
-  final bool secondPreview;
+// One block in the preview, made from an event or a change
+class _PreviewBlock {
+  final String title;
+  final DateTime start;
+  final DateTime end;
+  final _PreviewEventType type;
+  // where a moved event was before, shown in its label
+  final DateTime? movedFrom;
 
-  const _WeekPreview({required this.secondPreview});
+  const _PreviewBlock(
+    this.title,
+    this.start,
+    this.end,
+    this.type, {
+    this.movedFrom,
+  });
+}
+
+// The days the changes touch, with the events on them and the changes on top
+List<_PreviewBlock> _previewBlocks(
+  List<CalendarChange> changes,
+  List<CalendarEvent> events,
+) {
+  final days = <DateTime>{};
+  final moved = <CalendarEvent, CalendarChange>{};
+  final deleted = <CalendarEvent>{};
+  for (final change in changes) {
+    if (change.start != null) days.add(dateOnly(change.start!));
+    if (change.event != null) days.add(dateOnly(change.event!.start));
+    if (change.type == ChangeType.move) moved[change.event!] = change;
+    if (change.type == ChangeType.delete) deleted.add(change.event!);
+  }
+
+  final blocks = <_PreviewBlock>[];
+  for (final event in events) {
+    if (!days.contains(dateOnly(event.start))) continue;
+    final move = moved[event];
+    if (move != null) {
+      // only at the new time, the old one is in the changes list
+      blocks.add(_PreviewBlock(
+          event.title, move.start!, move.end!, _PreviewEventType.adjusted,
+          movedFrom: event.start));
+    } else if (deleted.contains(event)) {
+      blocks.add(_PreviewBlock(
+          event.title, event.start, event.end, _PreviewEventType.deleted));
+    } else {
+      blocks.add(_PreviewBlock(
+          event.title, event.start, event.end, _PreviewEventType.neutral));
+    }
+  }
+  for (final change in changes) {
+    if (change.type == ChangeType.add) {
+      blocks.add(_PreviewBlock(
+          change.title, change.start!, change.end!, _PreviewEventType.added));
+    }
+  }
+  return blocks;
+}
+
+const _hourHeight = 42.0;
+
+class _WeekPreview extends StatelessWidget {
+  final List<CalendarChange> changes;
+
+  const _WeekPreview({required this.changes});
 
   @override
   Widget build(BuildContext context) {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    final blocks = _previewBlocks(changes, myEvents);
+    final days = blocks.map((b) => dateOnly(b.start)).toSet().toList()..sort();
+    if (days.isEmpty) return const SizedBox.shrink();
+
+    // only the hours that have something in them, but at least 3
+    var firstHour = 23;
+    var lastHour = 0;
+    for (final block in blocks) {
+      if (block.start.hour < firstHour) firstHour = block.start.hour;
+      final endHour = block.end.minute == 0 && isSameDay(block.start, block.end)
+          ? block.end.hour
+          : block.end.hour + 1;
+      if (endHour > lastHour) lastHour = endHour;
+    }
+    if (lastHour - firstHour < 3) lastHour = firstHour + 3;
+    final hours = lastHour - firstHour;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'WEEK PREVIEW',
+          'PREVIEW',
           style:
               TextStyle(fontSize: 11, letterSpacing: 1.2, color: Colors.grey),
         ),
         const SizedBox(height: 8),
+        Row(
+          children: [
+            const SizedBox(width: 42),
+            for (final day in days)
+              Expanded(
+                child: Center(
+                  child: Text(
+                    '${weekdayNames[day.weekday - 1].substring(0, 3)} '
+                    '${day.day}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
         SizedBox(
-          height: 330,
+          height: hours * _hourHeight,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(
+              SizedBox(
                 width: 42,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                child: Stack(
                   children: [
-                    Text('14:00', style: TextStyle(fontSize: 10)),
-                    Text('15:00', style: TextStyle(fontSize: 10)),
-                    Text('16:00', style: TextStyle(fontSize: 10)),
-                    Text('17:00', style: TextStyle(fontSize: 10)),
-                    Text('18:00', style: TextStyle(fontSize: 10)),
-                    Text('19:00', style: TextStyle(fontSize: 10)),
-                    Text('20:00', style: TextStyle(fontSize: 10)),
+                    for (var i = 0; i < hours; i++)
+                      Positioned(
+                        top: i * _hourHeight,
+                        child: Text(
+                          '${twoDigits(firstHour + i)}:00',
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                      ),
                   ],
                 ),
               ),
               Expanded(
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        for (final day in days)
-                          Expanded(
-                            child: Center(
-                              child: Text(
-                                day,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) => Stack(
+                    children: [
+                      for (var i = 0; i < hours; i++)
+                        Positioned(
+                          top: i * _hourHeight,
+                          left: 0,
+                          right: 0,
+                          child: Divider(
+                            height: 1,
+                            color: Colors.grey.shade300,
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Expanded(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) => Stack(
-                          children: [
-                            for (var i = 0; i < 7; i++)
-                              Positioned(
-                                top: i * 42,
-                                left: 0,
-                                right: 0,
-                                child: Divider(
-                                  height: 1,
-                                  color: Colors.grey.shade300,
-                                ),
-                              ),
-                            _PreviewEvent(
-                              day: 0,
-                              row: 1,
-                              label: 'Class',
-                              type: _PreviewEventType.neutral,
-                              calendarWidth: constraints.maxWidth,
-                            ),
-                            _PreviewEvent(
-                              day: 1,
-                              row: 4,
-                              label: '18:00\nWorkout',
-                              type: _PreviewEventType.adjusted,
-                              outlined: true,
-                              calendarWidth: constraints.maxWidth,
-                            ),
-                            _PreviewEvent(
-                              day: 1,
-                              row: 5,
-                              label: '19:00\nWorkout\nADJUSTED',
-                              type: _PreviewEventType.adjusted,
-                              calendarWidth: constraints.maxWidth,
-                            ),
-                            _PreviewEvent(
-                              day: 2,
-                              row: 1,
-                              label: 'Study group\nDELETED',
-                              type: _PreviewEventType.deleted,
-                              calendarWidth: constraints.maxWidth,
-                            ),
-                            _PreviewEvent(
-                              day: 3,
-                              row: secondPreview ? 2 : 0,
-                              label: secondPreview
-                                  ? 'Study session\n16:00 ADDED'
-                                  : 'Study session\n14:00 ADDED',
-                              type: _PreviewEventType.added,
-                              calendarWidth: constraints.maxWidth,
-                            ),
-                            _PreviewEvent(
-                              day: 4,
-                              row: 3,
-                              label: 'Dinner',
-                              type: _PreviewEventType.neutral,
-                              calendarWidth: constraints.maxWidth,
-                            ),
-                          ],
                         ),
-                      ),
-                    ),
-                  ],
+                      for (final block in blocks)
+                        _PreviewEvent(
+                          block: block,
+                          column: days.indexOf(dateOnly(block.start)),
+                          columnWidth: constraints.maxWidth / days.length,
+                          firstHour: firstHour,
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Outlined old time: Workout · Tue 18:00–19:00',
-          style: TextStyle(fontSize: 11, color: Colors.grey),
         ),
       ],
     );
@@ -585,24 +617,20 @@ class _WeekPreview extends StatelessWidget {
 enum _PreviewEventType { neutral, added, adjusted, deleted }
 
 class _PreviewEvent extends StatelessWidget {
-  final int day;
-  final int row;
-  final String label;
-  final _PreviewEventType type;
-  final double calendarWidth;
-  final bool outlined;
+  final _PreviewBlock block;
+  final int column;
+  final double columnWidth;
+  final int firstHour;
 
   const _PreviewEvent({
-    required this.day,
-    required this.row,
-    required this.label,
-    required this.type,
-    required this.calendarWidth,
-    this.outlined = false,
+    required this.block,
+    required this.column,
+    required this.columnWidth,
+    required this.firstHour,
   });
 
   Color get _color {
-    switch (type) {
+    switch (block.type) {
       case _PreviewEventType.added:
         return const Color(0xff2e7d32);
       case _PreviewEventType.adjusted:
@@ -614,30 +642,40 @@ class _PreviewEvent extends StatelessWidget {
     }
   }
 
+  // e.g. " (was 13:00)", with the date if it was on another day
+  String _movedFromText() {
+    final from = block.movedFrom;
+    if (from == null) return '';
+    if (isSameDay(from, block.start)) return ' (was ${formatTime(from)})';
+    return ' (was ${formatShortDate(from)} ${formatTime(from)})';
+  }
+
+  // hours after the first hour of the preview, e.g. 1.5 for half past
+  double _hoursFromTop(DateTime time) =>
+      time.hour - firstHour + time.minute / 60;
+
   @override
   Widget build(BuildContext context) {
+    final top = _hoursFromTop(block.start) * _hourHeight;
+    final height =
+        block.end.difference(block.start).inMinutes / 60 * _hourHeight;
+
     return Positioned(
-      top: row * 42 + 3,
-      left: day * calendarWidth / 5,
-      width: calendarWidth / 5,
-      height: 38,
+      top: top + 2,
+      left: column * columnWidth,
+      width: columnWidth,
+      height: height - 4,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 2),
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: outlined
-              ? Colors.white
-              : type == _PreviewEventType.neutral
-                  ? Colors.grey.shade100
-                  : _color.withValues(alpha: .12),
-          border: Border.all(
-            color: _color,
-            width: outlined ? 1 : 1.5,
-            style: outlined ? BorderStyle.solid : BorderStyle.solid,
-          ),
+          color: block.type == _PreviewEventType.neutral
+              ? Colors.grey.shade100
+              : _color.withValues(alpha: .12),
+          border: Border.all(color: _color, width: 1.5),
         ),
         child: Text(
-          label,
+          '${formatTime(block.start)} ${block.title}${_movedFromText()}',
           style: TextStyle(
             color: _color,
             fontSize: 9,

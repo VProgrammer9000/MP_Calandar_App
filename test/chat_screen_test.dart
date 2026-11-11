@@ -104,6 +104,47 @@ void main() {
     expect(find.text('DELETED'), findsOneWidget);
   });
 
+  testWidgets('the calendar tab shows the day after the changes',
+      (tester) async {
+    // the sample calendar is built around today, so use its real events
+    final work = myEvents.indexWhere((e) => e.title == 'Work on Chrono app');
+    final start = myEvents[work].start;
+    String at(int hour) =>
+        DateTime(start.year, start.month, start.day, hour).toIso8601String();
+    // a meeting at 13-14, and the work (13-15) moved down to make room
+    final plan = {
+      'reply': 'Made room',
+      'changes': [
+        {
+          'type': 'add',
+          'title': 'Important meeting',
+          'start': at(13),
+          'end': at(14),
+        },
+        {'type': 'move', 'event': work, 'start': at(14), 'end': at(16)},
+      ],
+    };
+    tester.view.physicalSize = const Size(400, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(home: ChatScreen(client: fakeLlm(plan))),
+    );
+    await tester.tap(find.text('Plan changes'));
+    await send(tester, 'Make room for a meeting');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Review changes'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('13:00 Important meeting'), findsOneWidget);
+    // the moved event is only shown at its new time
+    expect(find.text('14:00 Work on Chrono app (was 13:00)'), findsOneWidget);
+    expect(find.textContaining('13:00 Work on Chrono app'), findsNothing);
+    // the other events that day are there too
+    expect(find.text('09:00 Mobile Programming lecture'), findsOneWidget);
+  });
+
   group('accept and reject', () {
     final addPlan = {
       'reply': 'Added it',

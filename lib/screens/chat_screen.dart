@@ -1,20 +1,45 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+import '../data/sample_data.dart';
+import '../services/chat_service.dart';
+import '../services/llm_service.dart';
 
 enum AssistantMode { quickReply, planChanges }
 
 enum PreviewTab { calendar, changes }
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  // only used by the tests, so they don't call the real API
+  final http.Client? client;
+
+  const ChatScreen({super.key, this.client});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
+// One bubble in the chat. The plan is only set on answers from the assistant.
+class _Message {
+  final String text;
+  final bool isUser;
+  final ChatPlan? plan;
+  // the review button is only shown if the user asked for planned changes
+  final bool showReview;
+
+  const _Message(
+    this.text, {
+    this.isUser = false,
+    this.plan,
+    this.showReview = false,
+  });
+}
+
 class _ChatScreenState extends State<ChatScreen> {
   final _messageController = TextEditingController();
   AssistantMode _mode = AssistantMode.quickReply;
-  final List<String> _sentMessages = [];
+  final List<_Message> _messages = [];
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -22,13 +47,33 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final message = _messageController.text.trim();
     if (message.isEmpty) return;
+    // the mode can be changed while waiting, so remember the one it was sent in
+    final wantsPlan = _mode == AssistantMode.planChanges;
     setState(() {
-      _sentMessages.add(message);
+      _messages.add(_Message(message, isUser: true));
       _messageController.clear();
+      _loading = true;
     });
+
+    try {
+      final plan = await planChanges(message, myEvents, client: widget.client);
+      if (!mounted) return;
+      setState(() {
+        _messages.add(_Message(
+          plan.reply,
+          plan: plan,
+          showReview: wantsPlan && plan.changes.isNotEmpty,
+        ));
+      });
+    } on LlmException catch (e) {
+      if (!mounted) return;
+      setState(() => _messages.add(_Message(e.message)));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   void _openPreview() {
@@ -49,25 +94,19 @@ class _ChatScreenState extends State<ChatScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                 children: [
                   const _ChatBubble(
-                    text: 'Can you help me make room for my study session?',
-                    isUser: true,
-                  ),
-                  const _ChatBubble(
                     text:
-                        'Sure — tell me what you would like to add, move, or remove.',
+                        'Hi! Tell me what you would like to add, move, or remove.',
                     isUser: false,
                   ),
-                  for (final message in _sentMessages) ...[
-                    _ChatBubble(text: message, isUser: true),
+                  for (final message in _messages)
                     _ChatBubble(
-                      text: _mode == AssistantMode.planChanges
-                          ? 'Here is a demo plan for those calendar changes.'
-                          : 'Here is a quick reply to your request.',
-                      isUser: false,
-                      showReviewButton: _mode == AssistantMode.planChanges,
+                      text: message.text,
+                      isUser: message.isUser,
+                      showReviewButton: message.showReview,
                       onReviewChanges: _openPreview,
                     ),
-                  ],
+                  if (_loading)
+                    const _ChatBubble(text: 'Thinking...', isUser: false),
                   const SizedBox(height: 8),
                   _ModeSelector(
                     mode: _mode,
@@ -78,7 +117,8 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             _Composer(
               controller: _messageController,
-              onSend: _sendMessage,
+              // only one message at a time
+              onSend: _loading ? null : _sendMessage,
             ),
           ],
         ),
@@ -174,7 +214,7 @@ class _ModeSelector extends StatelessWidget {
 
 class _Composer extends StatelessWidget {
   final TextEditingController controller;
-  final VoidCallback onSend;
+  final VoidCallback? onSend;
 
   const _Composer({required this.controller, required this.onSend});
 
@@ -192,7 +232,7 @@ class _Composer extends StatelessWidget {
               child: TextField(
                 controller: controller,
                 textInputAction: TextInputAction.send,
-                onSubmitted: (_) => onSend(),
+                onSubmitted: (_) => onSend?.call(),
                 minLines: 1,
                 maxLines: null,
                 decoration: const InputDecoration(
@@ -398,7 +438,8 @@ class _WeekPreview extends StatelessWidget {
       children: [
         const Text(
           'WEEK PREVIEW',
-          style: TextStyle(fontSize: 11, letterSpacing: 1.2, color: Colors.grey),
+          style:
+              TextStyle(fontSize: 11, letterSpacing: 1.2, color: Colors.grey),
         ),
         const SizedBox(height: 8),
         SizedBox(
@@ -600,9 +641,8 @@ class _ChangesList extends StatelessWidget {
         _ChangeCard(
           label: 'ADDED',
           title: 'Study session',
-          details: secondPreview
-              ? 'Thursday 16:00–17:00'
-              : 'Thursday 14:00–15:00',
+          details:
+              secondPreview ? 'Thursday 16:00–17:00' : 'Thursday 14:00–15:00',
           color: const Color(0xff2e7d32),
         ),
         _ChangeCard(

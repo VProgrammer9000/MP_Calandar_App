@@ -1,0 +1,117 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+import '../models/calendar_change.dart';
+import '../models/calendar_event.dart';
+import '../utils/dates.dart';
+import 'llm_service.dart';
+
+// What the assistant answered in the chat
+class ChatPlan {
+  final String reply;
+  final List<CalendarChange> changes;
+  // changes from the LLM that made no sense and were left out
+  final int skipped;
+
+  const ChatPlan({
+    required this.reply,
+    this.changes = const [],
+    this.skipped = 0,
+  });
+}
+
+// Asks the LLM what to change in the calendar for the user's message.
+// The events are numbered in the prompt, and the changes point back to them.
+Future<ChatPlan> planChanges(
+  String message,
+  List<CalendarEvent> events, {
+  DateTime? now,
+  http.Client? client,
+}) async {
+  final answer = await askLlm(
+    [
+      {
+        'role': 'system',
+        'content': buildPlanPrompt(now ?? DateTime.now(), events),
+      },
+      {'role': 'user', 'content': message},
+    ],
+    wantJson: true,
+    client: client,
+  );
+
+  final Map<String, dynamic> json;
+  try {
+    // some models put text around the JSON even if we ask them not to
+    final decoded = jsonDecode(
+        answer.substring(answer.indexOf('{'), answer.lastIndexOf('}') + 1));
+    json = decoded as Map<String, dynamic>;
+  } catch (e) {
+    throw LlmException('Could not understand the answer. Try again.');
+  }
+
+  final reply = json['reply'];
+  if (reply is! String || reply.trim().isEmpty) {
+    throw LlmException('Could not understand the answer. Try again.');
+  }
+
+  final changes = <CalendarChange>[];
+  var skipped = 0;
+  final list = json['changes'];
+  if (list is List) {
+    for (final item in list) {
+      try {
+        changes
+            .add(CalendarChange.fromJson(item as Map<String, dynamic>, events));
+      } catch (e) {
+        skipped++;
+      }
+    }
+  }
+
+  return ChatPlan(reply: reply.trim(), changes: changes, skipped: skipped);
+}
+
+String buildPlanPrompt(DateTime now, List<CalendarEvent> events) {
+  final weekday = weekdayNames[now.weekday - 1];
+  final today = _formatDate(now);
+  final lines = [
+    for (var i = 0; i < events.length; i++) _describeEvent(i, events[i]),
+  ].join('\n');
+
+  return '''
+You are the assistant in a calendar app. You help the user plan their week.
+Today is $weekday $today and the time is ${formatTime(now)}.
+
+These are the events in the calendar, each with its number:
+$lines
+
+Respond only with JSON with exactly these keys:
+- "reply": a short answer to the user, as a string
+- "changes": a list of changes to the calendar, empty if nothing should change
+
+Each change is one of these:
+- {"type": "add", "title": "...", "start": "...", "end": "..."}
+- {"type": "move", "event": number, "start": "...", "end": "..."}
+- {"type": "delete", "event": number}
+
+Write dates as local time like 2026-01-31T14:00, without a time zone.
+
+Rules:
+- Only make the changes the user asks for, or that are needed for them.
+- Never move a fixed event. Only delete one if the user asks for it.
+- New and moved events should not overlap other events.
+- If the user only asks a question, answer it and leave "changes" empty.
+''';
+}
+
+String _describeEvent(int number, CalendarEvent event) {
+  final day = weekdayNames[event.start.weekday - 1];
+  final kind = event.fixed ? 'fixed' : 'flexible';
+  return '$number: ${event.title}, $day ${_formatDate(event.start)} '
+      '${formatTime(event.start)}-${formatTime(event.end)}, $kind';
+}
+
+String _formatDate(DateTime d) =>
+    '${d.year}-${twoDigits(d.month)}-${twoDigits(d.day)}';

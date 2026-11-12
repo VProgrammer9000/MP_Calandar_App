@@ -103,7 +103,8 @@ $lines
 Respond only with JSON with exactly these keys, in this order:
 - "changes": a list of changes to the calendar, empty if nothing should change
 - "reply": a short answer to the user, as a string. It must only describe the
-  changes in the list, with the same times
+  changes in the list, with the same times. Write times in the reply like
+  "Thursday 13:00", never like 2026-11-12T13:00
 
 Each change is one of these:
 - {"type": "add", "title": "...", "start": "...", "end": "..."}
@@ -115,6 +116,8 @@ Write dates as local time like 2026-01-31T14:00, without a time zone.
 Rules:
 - Make the changes the user asks for. Don't change anything else, except to
   make room as described below.
+- Give a new event a short title, like "Meeting" or "Lunch with Anna". Never
+  put the time or length in the title.
 - Events must never overlap. If a new or moved event would overlap a flexible
   event, also move that flexible event to a free time, as close to its old
   time as possible. Do this even if the user did not ask for it.

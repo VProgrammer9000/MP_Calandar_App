@@ -45,16 +45,23 @@ class _Message {
   Map<String, String>? toHistory() {
     if (isUser) return {'role': 'user', 'content': text};
     if (plan == null) return null;
-    if (plan!.changes.isEmpty) return {'role': 'assistant', 'content': text};
-
-    final status = switch (accepted) {
-      true => 'The user accepted these, they are in the calendar now:',
-      false => 'The user rejected these, nothing was changed:',
-      null => 'Not accepted yet, so they are not in the calendar:',
-    };
-    final changes = plan!.changes.map((c) => '- ${c.describe()}').join('\n');
-    return {'role': 'assistant', 'content': '$text\n\n$status\n$changes'};
+    return _assistantTurn(text, plan!, accepted);
   }
+}
+
+// An answer from the LLM for the history, with the changes it proposed and
+// whether the user accepted them
+Map<String, String> _assistantTurn(
+    String reply, ChatPlan plan, bool? accepted) {
+  if (plan.changes.isEmpty) return {'role': 'assistant', 'content': reply};
+
+  final status = switch (accepted) {
+    true => 'The user accepted these, they are in the calendar now:',
+    false => 'The user rejected these, nothing was changed:',
+    null => 'Not accepted yet, so they are not in the calendar:',
+  };
+  final changes = plan.changes.map((c) => '- ${c.describe()}').join('\n');
+  return {'role': 'assistant', 'content': '$reply\n\n$status\n$changes'};
 }
 
 class _ChatScreenState extends State<ChatScreen> {
@@ -105,17 +112,30 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _openPreview(_Message message) async {
-    final accepted = await Navigator.of(context).push<bool>(
+    // the chat up to and with this answer, so the review page can refine it
+    final index = _messages.indexOf(message);
+    final history = [
+      for (final m in _messages.take(index + 1))
+        if (m.toHistory() != null) m.toHistory()!,
+    ];
+
+    final result = await Navigator.of(context).push<(bool, ChatPlan)>(
       MaterialPageRoute(
-          builder: (_) => ChangePreviewScreen(plan: message.plan!)),
+        builder: (_) => ChangePreviewScreen(
+          plan: message.plan!,
+          history: history,
+          client: widget.client,
+        ),
+      ),
     );
     // null means the user went back without deciding
-    if (accepted == null || !mounted) return;
-    // a plan can only be accepted or rejected once
+    if (result == null || !mounted) return;
+    final (accepted, plan) = result;
+    // a plan can only be accepted or rejected once. The plan can be a refined
+    // one, so the next messages know what was really accepted
     setState(() {
-      final index = _messages.indexOf(message);
-      _messages[index] =
-          _Message(message.text, plan: message.plan, accepted: accepted);
+      _messages[_messages.indexOf(message)] =
+          _Message(message.text, plan: plan, accepted: accepted);
     });
   }
 
@@ -303,8 +323,17 @@ class _Composer extends StatelessWidget {
 
 class ChangePreviewScreen extends StatefulWidget {
   final ChatPlan plan;
+  // the chat that led to this plan, sent along when the user refines it
+  final List<Map<String, String>> history;
+  // only used by the tests, so they don't call the real API
+  final http.Client? client;
 
-  const ChangePreviewScreen({super.key, required this.plan});
+  const ChangePreviewScreen({
+    super.key,
+    required this.plan,
+    this.history = const [],
+    this.client,
+  });
 
   @override
   State<ChangePreviewScreen> createState() => _ChangePreviewScreenState();
@@ -313,6 +342,11 @@ class ChangePreviewScreen extends StatefulWidget {
 class _ChangePreviewScreenState extends State<ChangePreviewScreen> {
   final _messageController = TextEditingController();
   PreviewTab _tab = PreviewTab.calendar;
+  // replaced every time the user refines the plan
+  late ChatPlan _plan = widget.plan;
+  late final List<Map<String, String>> _history = [...widget.history];
+  bool _loading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -320,11 +354,38 @@ class _ChangePreviewScreenState extends State<ChangePreviewScreen> {
     super.dispose();
   }
 
+  Future<void> _refine() async {
+    final message = _messageController.text.trim();
+    if (message.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final plan = await planChanges(message, myEvents,
+          history: _history, client: widget.client);
+      if (!mounted) return;
+      setState(() {
+        _history.add({'role': 'user', 'content': message});
+        _history.add(_assistantTurn(plan.reply, plan, null));
+        _plan = plan;
+        _messageController.clear();
+      });
+    } on LlmException catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   // goes back to the chat and tells it if the changes were accepted
   void _finish(bool accepted) {
-    if (accepted) applyChanges(widget.plan.changes, myEvents);
+    if (accepted) applyChanges(_plan.changes, myEvents);
     final messenger = ScaffoldMessenger.of(context);
-    Navigator.of(context).pop(accepted);
+    Navigator.of(context).pop((accepted, _plan));
     messenger.showSnackBar(SnackBar(
       content: Text(accepted
           ? 'The changes are in your calendar.'
@@ -343,12 +404,12 @@ class _ChangePreviewScreenState extends State<ChangePreviewScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                 children: [
-                  if (widget.plan.skipped > 0) ...[
+                  if (_plan.skipped > 0) ...[
                     Align(
                       alignment: Alignment.centerLeft,
                       child: _LabelChip(
-                        text: '${widget.plan.skipped} '
-                            '${widget.plan.skipped == 1 ? 'change' : 'changes'}'
+                        text: '${_plan.skipped} '
+                            '${_plan.skipped == 1 ? 'change' : 'changes'}'
                             ' left out',
                         color: Colors.red.shade700,
                       ),
@@ -356,7 +417,7 @@ class _ChangePreviewScreenState extends State<ChangePreviewScreen> {
                     const SizedBox(height: 14),
                   ],
                   Text(
-                    _summary(widget.plan.changes),
+                    _summary(_plan.changes),
                     style: const TextStyle(
                         fontSize: 22, fontWeight: FontWeight.w600),
                   ),
@@ -388,16 +449,27 @@ class _ChangePreviewScreenState extends State<ChangePreviewScreen> {
                   ),
                   const SizedBox(height: 16),
                   if (_tab == PreviewTab.calendar)
-                    _WeekPreview(changes: widget.plan.changes)
+                    _WeekPreview(changes: _plan.changes)
                   else
-                    _ChangesList(changes: widget.plan.changes),
+                    _ChangesList(changes: _plan.changes),
                   const SizedBox(height: 20),
                   _FurtherChanges(
                     controller: _messageController,
-                    onPreview: () {
-                      // TODO: send the further change to the assistant
-                    },
+                    loading: _loading,
+                    // only one request at a time
+                    onPreview: _loading ? null : _refine,
                   ),
+                  // the answer to the last refine, the first one is in the chat
+                  if (_plan != widget.plan) ...[
+                    const SizedBox(height: 10),
+                    Text(_plan.reply,
+                        style: const TextStyle(color: Colors.black54)),
+                  ],
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 10),
+                    Text(_errorMessage!,
+                        style: TextStyle(color: Colors.red.shade700)),
+                  ],
                 ],
               ),
             ),
@@ -852,10 +924,12 @@ class _ChangeCard extends StatelessWidget {
 
 class _FurtherChanges extends StatelessWidget {
   final TextEditingController controller;
-  final VoidCallback onPreview;
+  final bool loading;
+  final VoidCallback? onPreview;
 
   const _FurtherChanges({
     required this.controller,
+    required this.loading,
     required this.onPreview,
   });
 
@@ -897,7 +971,7 @@ class _FurtherChanges extends StatelessWidget {
                   vertical: 14,
                 ),
               ),
-              child: const Text('Preview changes'),
+              child: Text(loading ? 'Thinking...' : 'Preview changes'),
             ),
           ],
         ),

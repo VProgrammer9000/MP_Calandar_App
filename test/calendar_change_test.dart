@@ -36,8 +36,8 @@ void main() {
     final change = CalendarChange.fromJson({
       'type': 'move',
       'event': 0,
-      'start': '2026-11-10T19:00',
-      'end': '2026-11-10T20:00',
+      'new_start': '2026-11-10T19:00',
+      'new_end': '2026-11-10T20:00',
     }, events);
 
     expect(change.type, ChangeType.move);
@@ -55,13 +55,25 @@ void main() {
     expect(change.title, 'Algorithms class');
   });
 
+  test('a move to the same time is not a change', () {
+    expect(
+      () => CalendarChange.fromJson({
+        'type': 'move',
+        'event': 0,
+        'new_start': '2026-11-10T18:00',
+        'new_end': '2026-11-10T19:00',
+      }, events),
+      throwsFormatException,
+    );
+  });
+
   test('does not move fixed events', () {
     expect(
       () => CalendarChange.fromJson({
         'type': 'move',
         'event': 1,
-        'start': '2026-11-11T13:00',
-        'end': '2026-11-11T15:00',
+        'new_start': '2026-11-11T13:00',
+        'new_end': '2026-11-11T15:00',
       }, events),
       throwsFormatException,
     );
@@ -79,8 +91,8 @@ void main() {
       CalendarChange.fromJson({
         'type': 'move',
         'event': 0,
-        'start': '2026-11-10T19:00',
-        'end': '2026-11-10T20:00',
+        'new_start': '2026-11-10T19:00',
+        'new_end': '2026-11-10T20:00',
       }, list),
       CalendarChange.fromJson({'type': 'delete', 'event': 1}, list),
     ];
@@ -100,8 +112,8 @@ void main() {
     final move = CalendarChange.fromJson({
       'type': 'move',
       'event': 0,
-      'start': '2026-11-10T19:00',
-      'end': '2026-11-10T20:00',
+      'new_start': '2026-11-10T19:00',
+      'new_end': '2026-11-10T20:00',
     }, list);
     list.removeAt(0);
 
@@ -120,8 +132,8 @@ void main() {
     final move = CalendarChange.fromJson({
       'type': 'move',
       'event': 0,
-      'start': '2026-11-10T19:00',
-      'end': '2026-11-10T20:00',
+      'new_start': '2026-11-10T19:00',
+      'new_end': '2026-11-10T20:00',
     }, events);
     final delete =
         CalendarChange.fromJson({'type': 'delete', 'event': 1}, events);

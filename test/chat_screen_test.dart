@@ -121,7 +121,7 @@ void main() {
           'start': at(13),
           'end': at(14),
         },
-        {'type': 'move', 'event': work, 'start': at(14), 'end': at(16)},
+        {'type': 'move', 'event': work, 'new_start': at(14), 'new_end': at(16)},
       ],
     };
     tester.view.physicalSize = const Size(400, 2400);
@@ -285,6 +285,111 @@ void main() {
         contains('- add "Meeting" Wed 11 Nov 13:00-14:00'));
     expect(third[3]['content'], 'Hello?');
     expect(third[4]['content'], 'Actually it starts at 14');
+  });
+
+  group('refine', () {
+    Map<String, dynamic> meetingAt(int hour) => {
+          'reply': 'Meeting at $hour',
+          'changes': [
+            {
+              'type': 'add',
+              'title': 'Meeting',
+              'start': '2026-11-11T$hour:00',
+              'end': '2026-11-11T${hour + 1}:00',
+            },
+          ],
+        };
+
+    // answers with the plans in order and keeps what was sent
+    MockClient answers(List<Map<String, dynamic>?> plans, List<dynamic> sent) {
+      var call = 0;
+      return MockClient((request) async {
+        sent.add(jsonDecode(request.body)['messages']);
+        final plan = plans[call++];
+        // null means the request fails
+        if (plan == null) return http.Response('', 429);
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {'content': jsonEncode(plan)},
+              },
+            ],
+          }),
+          200,
+        );
+      });
+    }
+
+    Future<void> openReview(WidgetTester tester, MockClient client) async {
+      final before = [...myEvents];
+      addTearDown(() => myEvents
+        ..clear()
+        ..addAll(before));
+      tester.view.physicalSize = const Size(400, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(MaterialApp(home: ChatScreen(client: client)));
+      await tester.tap(find.text('Plan changes'));
+      await send(tester, 'Meeting at 13');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Review changes'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Changes list'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a further change replaces the plan and can be accepted',
+        (tester) async {
+      final sent = [];
+      await openReview(
+          tester, answers([meetingAt(13), meetingAt(16), meetingAt(9)], sent));
+      expect(find.text('Wed 11 Nov 13:00–14:00'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'Make it 16 instead');
+      await tester.tap(find.text('Preview changes'));
+      await tester.pumpAndSettle();
+
+      // the new plan is shown, with its answer
+      expect(find.text('Wed 11 Nov 16:00–17:00'), findsOneWidget);
+      expect(find.text('Wed 11 Nov 13:00–14:00'), findsNothing);
+      expect(find.text('Meeting at 16'), findsOneWidget);
+      // the refine was sent with the chat that led to the plan
+      final refine = sent[1] as List;
+      expect(refine.map((m) => m['role']),
+          ['system', 'user', 'assistant', 'user']);
+      expect(refine[2]['content'], contains('- add "Meeting"'));
+      expect(refine[3]['content'], 'Make it 16 instead');
+
+      // accept puts the refined meeting in the calendar
+      await tester.tap(find.text('Accept changes'));
+      await tester.pumpAndSettle();
+      expect(myEvents.last.start.hour, 16);
+
+      // and the chat remembers that the refined plan was accepted.
+      // wait for the snack bar to go, it covers the send button
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      await send(tester, 'Thanks');
+      await tester.pumpAndSettle();
+      final next = sent[2] as List;
+      expect(next[2]['content'], contains('accepted'));
+      expect(next[2]['content'], contains('16:00-17:00'));
+    });
+
+    testWidgets('a failed refine keeps the plan and shows the error',
+        (tester) async {
+      final sent = [];
+      await openReview(tester, answers([meetingAt(13), null], sent));
+
+      await tester.enterText(find.byType(TextField), 'Make it 16 instead');
+      await tester.tap(find.text('Preview changes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Too many requests. Try again later.'), findsOneWidget);
+      expect(find.text('Wed 11 Nov 13:00–14:00'), findsOneWidget);
+    });
   });
 
   testWidgets('no review button when nothing changes', (tester) async {

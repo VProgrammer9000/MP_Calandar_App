@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/calendar_change.dart';
@@ -76,6 +77,8 @@ Future<ChatPlan> planChanges(
             .add(CalendarChange.fromJson(item as Map<String, dynamic>, events));
       } catch (e) {
         skipped++;
+        // shows up in the flutter run console, so we can see what went wrong
+        debugPrint('Left out a change from the LLM: ${jsonEncode(item)} ($e)');
       }
     }
   }
@@ -97,21 +100,28 @@ Today is $weekday $today and the time is ${formatTime(now)}.
 These are the events in the calendar, each with its number:
 $lines
 
-Respond only with JSON with exactly these keys:
-- "reply": a short answer to the user, as a string
+Respond only with JSON with exactly these keys, in this order:
 - "changes": a list of changes to the calendar, empty if nothing should change
+- "reply": a short answer to the user, as a string. It must only describe the
+  changes in the list, with the same times
 
 Each change is one of these:
 - {"type": "add", "title": "...", "start": "...", "end": "..."}
-- {"type": "move", "event": number, "start": "...", "end": "..."}
+- {"type": "move", "event": number, "new_start": "...", "new_end": "..."}
 - {"type": "delete", "event": number}
 
 Write dates as local time like 2026-01-31T14:00, without a time zone.
 
 Rules:
-- Only make the changes the user asks for, or that are needed for them.
-- Never move a fixed event. Only delete one if the user asks for it.
-- New and moved events should not overlap other events.
+- Make the changes the user asks for. Don't change anything else, except to
+  make room as described below.
+- Events must never overlap. If a new or moved event would overlap a flexible
+  event, also move that flexible event to a free time, as close to its old
+  time as possible. Do this even if the user did not ask for it.
+- Never move a fixed event. Only delete an event if the user asks for it.
+- If an overlap with a fixed event can't be avoided, make no changes and
+  explain why in the reply.
+- A move must give the event a new time, never the time it already has.
 - If the user only asks a question, answer it and leave "changes" empty.
 ''';
 }

@@ -35,7 +35,7 @@ class CalendarChange {
       if (title is! String || title.trim().isEmpty) {
         throw const FormatException('The new event has no title');
       }
-      final (start, end) = _readTimes(json);
+      final (start, end) = _readTimes(json, 'start', 'end');
       return CalendarChange(
         type: type,
         title: title.trim(),
@@ -57,7 +57,12 @@ class CalendarChange {
     if (event.fixed) {
       throw const FormatException('Fixed events can not be moved');
     }
-    final (start, end) = _readTimes(json);
+    // other names than for an add, so the LLM doesn't copy the old times
+    final (start, end) = _readTimes(json, 'new_start', 'new_end');
+    // the LLM sometimes says it moved something but gives the same time
+    if (start == event.start && end == event.end) {
+      throw const FormatException('The event is moved to where it already is');
+    }
     return CalendarChange(
       type: type,
       title: event.title,
@@ -91,9 +96,13 @@ class CalendarChange {
     throw const FormatException('Unknown type of change');
   }
 
-  static (DateTime, DateTime) _readTimes(Map<String, dynamic> json) {
-    final start = _readDate(json['start']);
-    final end = _readDate(json['end']);
+  static (DateTime, DateTime) _readTimes(
+    Map<String, dynamic> json,
+    String startKey,
+    String endKey,
+  ) {
+    final start = _readDate(json[startKey]);
+    final end = _readDate(json[endKey]);
     if (start == null || end == null || !end.isAfter(start)) {
       throw const FormatException('The change has no valid time');
     }

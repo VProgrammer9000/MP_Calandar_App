@@ -8,8 +8,6 @@ import '../services/chat_service.dart';
 import '../services/llm_service.dart';
 import '../utils/dates.dart';
 
-enum AssistantMode { quickReply, planChanges }
-
 enum PreviewTab { calendar, changes }
 
 class ChatScreen extends StatefulWidget {
@@ -27,8 +25,6 @@ class _Message {
   final String text;
   final bool isUser;
   final ChatPlan? plan;
-  // the review button is only shown if the user asked for planned changes
-  final bool showReview;
   // null until the user accepts or rejects the plan
   final bool? accepted;
 
@@ -36,9 +32,12 @@ class _Message {
     this.text, {
     this.isUser = false,
     this.plan,
-    this.showReview = false,
     this.accepted,
   });
+
+  // the changes can be reviewed until the user has accepted or rejected them
+  bool get showReview =>
+      plan != null && plan!.changes.isNotEmpty && accepted == null;
 
   // What the LLM gets to see of this message when the next one is sent.
   // Errors are left out, they were never an answer from the LLM.
@@ -66,7 +65,6 @@ Map<String, String> _assistantTurn(
 
 class _ChatScreenState extends State<ChatScreen> {
   final _messageController = TextEditingController();
-  AssistantMode _mode = AssistantMode.quickReply;
   final List<_Message> _messages = [];
   bool _loading = false;
 
@@ -79,8 +77,6 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendMessage() async {
     final message = _messageController.text.trim();
     if (message.isEmpty) return;
-    // the mode can be changed while waiting, so remember the one it was sent in
-    final wantsPlan = _mode == AssistantMode.planChanges;
     // the chat so far, before the new message is added to it
     final history = [
       for (final m in _messages)
@@ -96,13 +92,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final plan = await planChanges(message, myEvents,
           history: history, client: widget.client);
       if (!mounted) return;
-      setState(() {
-        _messages.add(_Message(
-          plan.reply,
-          plan: plan,
-          showReview: wantsPlan && plan.changes.isNotEmpty,
-        ));
-      });
+      setState(() => _messages.add(_Message(plan.reply, plan: plan)));
     } on LlmException catch (e) {
       if (!mounted) return;
       setState(() => _messages.add(_Message(e.message)));
@@ -164,11 +154,6 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   if (_loading)
                     const _ChatBubble(text: 'Thinking...', isUser: false),
-                  const SizedBox(height: 8),
-                  _ModeSelector(
-                    mode: _mode,
-                    onChanged: (mode) => setState(() => _mode = mode),
-                  ),
                 ],
               ),
             ),
@@ -231,39 +216,6 @@ class _ChatBubble extends StatelessWidget {
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ModeSelector extends StatelessWidget {
-  final AssistantMode mode;
-  final ValueChanged<AssistantMode> onChanged;
-
-  const _ModeSelector({required this.mode, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return SegmentedButton<AssistantMode>(
-      showSelectedIcon: false,
-      segments: const [
-        ButtonSegment(
-          value: AssistantMode.quickReply,
-          label: Text('Quick reply'),
-        ),
-        ButtonSegment(
-          value: AssistantMode.planChanges,
-          label: Text('Plan changes'),
-        ),
-      ],
-      selected: {mode},
-      onSelectionChanged: (selection) => onChanged(selection.first),
-      style: SegmentedButton.styleFrom(
-        selectedBackgroundColor: Colors.black,
-        selectedForegroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        side: const BorderSide(color: Colors.black),
-        shape: const RoundedRectangleBorder(),
       ),
     );
   }

@@ -54,19 +54,6 @@ void main() {
 
     expect(find.text('Thinking...'), findsNothing);
     expect(find.text('I moved the gym one hour later.'), findsOneWidget);
-    // quick reply is picked by default, so no review
-    expect(find.text('Review changes'), findsNothing);
-  });
-
-  testWidgets('plan changes shows the review button', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(home: ChatScreen(client: fakeLlm(movePlan))),
-    );
-
-    await tester.tap(find.text('Plan changes'));
-    await send(tester, 'Move the gym');
-    await tester.pumpAndSettle();
-
     expect(find.text('Review changes'), findsOneWidget);
   });
 
@@ -89,7 +76,6 @@ void main() {
       MaterialApp(home: ChatScreen(client: fakeLlm(plan))),
     );
 
-    await tester.tap(find.text('Plan changes'));
     await send(tester, 'Make room for a meeting');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Review changes'));
@@ -131,7 +117,6 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: ChatScreen(client: fakeLlm(plan))),
     );
-    await tester.tap(find.text('Plan changes'));
     await send(tester, 'Make room for a meeting');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Review changes'));
@@ -164,7 +149,6 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: ChatScreen(client: fakeLlm(plan))),
     );
-    await tester.tap(find.text('Plan changes'));
     await send(tester, 'Add a call');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Review changes'));
@@ -198,7 +182,6 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(home: ChatScreen(client: fakeLlm(addPlan))),
       );
-      await tester.tap(find.text('Plan changes'));
       await send(tester, 'Add a meeting');
       await tester.pumpAndSettle();
       await tester.tap(find.text('Review changes'));
@@ -331,7 +314,6 @@ void main() {
       addTearDown(tester.view.reset);
 
       await tester.pumpWidget(MaterialApp(home: ChatScreen(client: client)));
-      await tester.tap(find.text('Plan changes'));
       await send(tester, 'Meeting at 13');
       await tester.pumpAndSettle();
       await tester.tap(find.text('Review changes'));
@@ -398,7 +380,6 @@ void main() {
       MaterialApp(home: ChatScreen(client: fakeLlm(plan))),
     );
 
-    await tester.tap(find.text('Plan changes'));
     await send(tester, 'When is the gym?');
     await tester.pumpAndSettle();
 

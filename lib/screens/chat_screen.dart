@@ -63,9 +63,15 @@ Map<String, String> _assistantTurn(
   return {'role': 'assistant', 'content': '$reply\n\n$status\n$changes'};
 }
 
+// Kept outside the screen, so the chat is still there after switching tabs.
+// It is gone when the app is closed.
+final List<_Message> _messages = [];
+
+@visibleForTesting
+void clearChat() => _messages.clear();
+
 class _ChatScreenState extends State<ChatScreen> {
   final _messageController = TextEditingController();
-  final List<_Message> _messages = [];
   bool _loading = false;
 
   @override
@@ -88,14 +94,13 @@ class _ChatScreenState extends State<ChatScreen> {
       _loading = true;
     });
 
+    // the answer is kept even if the user went to another tab while waiting
     try {
       final plan = await planChanges(message, myEvents,
           history: history, client: widget.client);
-      if (!mounted) return;
-      setState(() => _messages.add(_Message(plan.reply, plan: plan)));
+      _messages.add(_Message(plan.reply, plan: plan));
     } on LlmException catch (e) {
-      if (!mounted) return;
-      setState(() => _messages.add(_Message(e.message)));
+      _messages.add(_Message(e.message));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -119,14 +124,13 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
     // null means the user went back without deciding
-    if (result == null || !mounted) return;
+    if (result == null) return;
     final (accepted, plan) = result;
     // a plan can only be accepted or rejected once. The plan can be a refined
     // one, so the next messages know what was really accepted
-    setState(() {
-      _messages[_messages.indexOf(message)] =
-          _Message(message.text, plan: plan, accepted: accepted);
-    });
+    _messages[_messages.indexOf(message)] =
+        _Message(message.text, plan: plan, accepted: accepted);
+    if (mounted) setState(() {});
   }
 
   @override

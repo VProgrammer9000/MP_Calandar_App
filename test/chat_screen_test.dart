@@ -39,6 +39,39 @@ void main() {
     ],
   };
 
+  // the chat is kept between screens, so each test starts with an empty one
+  setUp(clearChat);
+
+  testWidgets('the chat is still there after leaving the screen',
+      (tester) async {
+    final client = fakeLlm(movePlan);
+    await tester.pumpWidget(MaterialApp(home: ChatScreen(client: client)));
+    await send(tester, 'Move the gym');
+    await tester.pumpAndSettle();
+
+    // like switching to another tab and back
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pumpWidget(MaterialApp(home: ChatScreen(client: client)));
+
+    expect(find.text('Move the gym'), findsOneWidget);
+    expect(find.text('I moved the gym one hour later.'), findsOneWidget);
+  });
+
+  testWidgets('an answer that comes after leaving the screen is kept',
+      (tester) async {
+    final wait = Completer<void>();
+    final client = fakeLlm(movePlan, wait: wait);
+    await tester.pumpWidget(MaterialApp(home: ChatScreen(client: client)));
+    await send(tester, 'Move the gym');
+
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    wait.complete();
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(MaterialApp(home: ChatScreen(client: client)));
+
+    expect(find.text('I moved the gym one hour later.'), findsOneWidget);
+  });
+
   testWidgets('shows the reply from the assistant', (tester) async {
     final wait = Completer<void>();
     await tester.pumpWidget(

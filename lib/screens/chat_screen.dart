@@ -106,6 +106,28 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _clearChat() async {
+    final clear = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear chat?'),
+        content: const Text(
+            'The messages are removed. Changes you accepted stay in your calendar.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (clear == true && mounted) setState(clearChat);
+  }
+
   Future<void> _openPreview(_Message message) async {
     // the chat up to and with this answer, so the review page can refine it
     final index = _messages.indexOf(message);
@@ -136,7 +158,17 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Calendar assistant')),
+      appBar: AppBar(
+        title: const Text('Calendar assistant'),
+        actions: [
+          IconButton(
+            tooltip: 'Clear chat',
+            icon: const Icon(Icons.delete_outline),
+            // not while waiting, the answer would end up in the new chat
+            onPressed: _messages.isEmpty || _loading ? null : _clearChat,
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [

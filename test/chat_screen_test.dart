@@ -72,6 +72,31 @@ void main() {
     expect(find.text('I moved the gym one hour later.'), findsOneWidget);
   });
 
+  testWidgets('the clear button empties the chat after asking', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(home: ChatScreen(client: fakeLlm(movePlan))),
+    );
+    final clear = find.widgetWithIcon(IconButton, Icons.delete_outline);
+    // nothing to clear yet
+    expect(tester.widget<IconButton>(clear).onPressed, isNull);
+
+    await send(tester, 'Move the gym');
+    await tester.pumpAndSettle();
+
+    await tester.tap(clear);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Move the gym'), findsOneWidget);
+
+    await tester.tap(clear);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Clear'));
+    await tester.pumpAndSettle();
+    expect(find.text('Move the gym'), findsNothing);
+    expect(find.text('I moved the gym one hour later.'), findsNothing);
+  });
+
   testWidgets('shows the reply from the assistant', (tester) async {
     final wait = Completer<void>();
     await tester.pumpWidget(

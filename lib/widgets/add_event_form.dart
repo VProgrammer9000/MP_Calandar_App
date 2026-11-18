@@ -90,67 +90,72 @@ class _AddEventFormState extends State<AddEventForm> {
   Widget build(BuildContext context) {
     return Form(
       key: _formKey,
-      child: ListView(
+      // not a ListView: it only builds the fields on screen, so the title
+      // check was skipped when you scrolled down to the button
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        children: [
-          _labelText('title'),
-          TextFormField(
-            controller: _title,
-            decoration: _decoration(),
-            validator: (value) => value == null || value.trim().isEmpty
-                ? 'Give it a title'
-                : null,
-          ),
-          const SizedBox(height: 16),
-          _labelText('description'),
-          TextFormField(
-            controller: _description,
-            maxLines: 2,
-            decoration: _decoration(),
-          ),
-          const SizedBox(height: 16),
-          _labelText('location'),
-          TextFormField(
-            controller: _location,
-            decoration: _decoration(hint: 'Room 310, Library, Online'),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(child: _dateField('start', _start, _pickStart)),
-              const SizedBox(width: 12),
-              Expanded(child: _dateField('end', _end, _pickEnd)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _labelText('label'),
-          _labels(),
-          const SizedBox(height: 16),
-          _labelText('type'),
-          _type(),
-          const SizedBox(height: 16),
-          _labelText('priority'),
-          _priorities(),
-          const SizedBox(height: 12),
-          const Divider(height: 2, thickness: 2, color: Colors.black),
-          const SizedBox(height: 16),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.black,
-              foregroundColor: Colors.white,
-              shape: const RoundedRectangleBorder(),
-              alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _labelText('title'),
+            TextFormField(
+              controller: _title,
+              decoration: _decoration(),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Give it a title'
+                  : null,
             ),
-            onPressed: _save,
-            child: const Text('Add event'),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
+            const SizedBox(height: 16),
+            _labelText('description'),
+            TextFormField(
+              controller: _description,
+              maxLines: 2,
+              decoration: _decoration(),
+            ),
+            const SizedBox(height: 16),
+            _labelText('location'),
+            TextFormField(
+              controller: _location,
+              decoration: _decoration(hint: 'Room 310, Library, Online'),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: _dateField('start', _start, _pickStart)),
+                const SizedBox(width: 12),
+                Expanded(child: _dateField('end', _end, _pickEnd)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _labelText('label'),
+            _labels(),
+            const SizedBox(height: 16),
+            _labelText('type'),
+            _type(),
+            const SizedBox(height: 16),
+            _labelText('priority'),
+            _priorities(),
+            const SizedBox(height: 12),
+            const Divider(height: 2, thickness: 2, color: Colors.black),
+            const SizedBox(height: 16),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                shape: const RoundedRectangleBorder(),
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.all(18),
+              ),
+              onPressed: _save,
+              child: const Text('Add event'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
       ),
     );
   }

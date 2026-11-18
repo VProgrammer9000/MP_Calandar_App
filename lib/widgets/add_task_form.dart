@@ -110,235 +110,248 @@ class _AddTaskFormState extends State<AddTaskForm> {
   Widget build(BuildContext context) {
     return Form(
       key: _formKey,
-      child: ListView(
+      // not a ListView: it only builds the fields on screen, so the title
+      // check was skipped when you scrolled down to the button
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        children: [
-          _fieldLabel('title'),
-          TextFormField(
-            controller: _titleController,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: _inputDecoration(),
-            validator: (value) => value == null || value.trim().isEmpty
-                ? 'Give it a title'
-                : null,
-          ),
-          const SizedBox(height: 16),
-          _fieldLabel('description'),
-          TextFormField(
-            controller: _descriptionController,
-            maxLines: 2,
-            decoration: _inputDecoration(),
-          ),
-          const SizedBox(height: 16),
-          _fieldLabel('location'),
-          TextFormField(
-            controller: _locationController,
-            decoration: _inputDecoration(hintText: 'Room 310, Library, Online'),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _fieldLabel('earliest start'),
-                    TextFormField(
-                      controller: _startController,
-                      readOnly: true,
-                      onTap: _pickStart,
-                      decoration: _inputDecoration(
-                        suffixIcon: const Icon(Icons.event_outlined, size: 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _fieldLabel('title'),
+            TextFormField(
+              controller: _titleController,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: _inputDecoration(),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Give it a title'
+                  : null,
+            ),
+            const SizedBox(height: 16),
+            _fieldLabel('description'),
+            TextFormField(
+              controller: _descriptionController,
+              maxLines: 2,
+              decoration: _inputDecoration(),
+            ),
+            const SizedBox(height: 16),
+            _fieldLabel('location'),
+            TextFormField(
+              controller: _locationController,
+              decoration:
+                  _inputDecoration(hintText: 'Room 310, Library, Online'),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _fieldLabel('earliest start'),
+                      TextFormField(
+                        controller: _startController,
+                        readOnly: true,
+                        onTap: _pickStart,
+                        decoration: _inputDecoration(
+                          suffixIcon:
+                              const Icon(Icons.event_outlined, size: 18),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _fieldLabel('deadline'),
-                    TextFormField(
-                      controller: _deadlineController,
-                      readOnly: true,
-                      onTap: _pickDeadline,
-                      decoration: _inputDecoration(
-                        suffixIcon: const Icon(Icons.event_outlined, size: 18),
-                      ),
-                      validator: (_) => _deadline != null &&
-                              _earliestStart != null &&
-                              _deadline!.isBefore(_earliestStart!)
-                          ? 'Before the start'
-                          : null,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _fieldLabel('length'),
-                    TextFormField(
-                      controller: _lengthController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: _inputDecoration(suffixText: 'h'),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return null;
-                        }
-                        return _parseLength(value) == null
-                            ? 'Hours, like 1.5'
-                            : null;
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _fieldLabel('split into'),
-                    DropdownButtonFormField<Duration?>(
-                      initialValue: _splitInto,
-                      isExpanded: true,
-                      decoration: _inputDecoration(),
-                      items: [
-                        for (final option in _splitOptions)
-                          DropdownMenuItem(
-                            value: option,
-                            child: Text(
-                              option == null
-                                  ? 'One block'
-                                  : '${formatDuration(option)} blocks',
-                            ),
-                          ),
-                      ],
-                      onChanged: (value) => setState(() => _splitInto = value),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _fieldLabel('label'),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final label in defaultLabels)
-                ChoiceChip(
-                  selected: _label == label.name,
-                  showCheckmark: false,
-                  selectedColor: Colors.grey.shade300,
-                  backgroundColor: Colors.white,
-                  side: const BorderSide(color: Colors.black26),
-                  shape: const RoundedRectangleBorder(),
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  labelPadding: const EdgeInsets.only(left: 2, right: 4),
-                  avatarBoxConstraints: const BoxConstraints.tightFor(
-                    width: 14,
-                    height: 14,
+                    ],
                   ),
-                  avatar: Container(width: 10, height: 10, color: label.color),
-                  label: Text(label.name, style: const TextStyle(fontSize: 11)),
-                  onSelected: (selected) {
-                    setState(() => _label = selected ? label.name : null);
-                  },
                 ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _fieldLabel('type'),
-          SizedBox(
-            width: double.infinity,
-            child: SegmentedButton<bool>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(value: false, label: Text('Flexible')),
-                ButtonSegment(value: true, label: Text('Fixed')),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _fieldLabel('deadline'),
+                      TextFormField(
+                        controller: _deadlineController,
+                        readOnly: true,
+                        onTap: _pickDeadline,
+                        decoration: _inputDecoration(
+                          suffixIcon:
+                              const Icon(Icons.event_outlined, size: 18),
+                        ),
+                        validator: (_) => _deadline != null &&
+                                _earliestStart != null &&
+                                _deadline!.isBefore(_earliestStart!)
+                            ? 'Before the start'
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
               ],
-              selected: {_fixed},
-              onSelectionChanged: (selection) {
-                setState(() => _fixed = selection.first);
+            ),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _fieldLabel('length'),
+                      TextFormField(
+                        controller: _lengthController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: _inputDecoration(suffixText: 'h'),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return null;
+                          }
+                          return _parseLength(value) == null
+                              ? 'Hours, like 1.5'
+                              : null;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _fieldLabel('split into'),
+                      DropdownButtonFormField<Duration?>(
+                        initialValue: _splitInto,
+                        isExpanded: true,
+                        decoration: _inputDecoration(),
+                        items: [
+                          for (final option in _splitOptions)
+                            DropdownMenuItem(
+                              value: option,
+                              child: Text(
+                                option == null
+                                    ? 'One block'
+                                    : '${formatDuration(option)} blocks',
+                              ),
+                            ),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _splitInto = value),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _fieldLabel('label'),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final label in defaultLabels)
+                  ChoiceChip(
+                    selected: _label == label.name,
+                    showCheckmark: false,
+                    selectedColor: Colors.grey.shade300,
+                    backgroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.black26),
+                    shape: const RoundedRectangleBorder(),
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    labelPadding: const EdgeInsets.only(left: 2, right: 4),
+                    avatarBoxConstraints: const BoxConstraints.tightFor(
+                      width: 14,
+                      height: 14,
+                    ),
+                    avatar:
+                        Container(width: 10, height: 10, color: label.color),
+                    label:
+                        Text(label.name, style: const TextStyle(fontSize: 11)),
+                    onSelected: (selected) {
+                      setState(() => _label = selected ? label.name : null);
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _fieldLabel('type'),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<bool>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: false, label: Text('Flexible')),
+                  ButtonSegment(value: true, label: Text('Fixed')),
+                ],
+                selected: {_fixed},
+                onSelectionChanged: (selection) {
+                  setState(() => _fixed = selection.first);
+                },
+                style: SegmentedButton.styleFrom(
+                  selectedBackgroundColor: Colors.black,
+                  selectedForegroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                  side: const BorderSide(color: Colors.black),
+                  shape: const RoundedRectangleBorder(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _fieldLabel('priority'),
+            RadioGroup<Priority>(
+              groupValue: _priority,
+              onChanged: (value) {
+                if (value != null) setState(() => _priority = value);
               },
-              style: SegmentedButton.styleFrom(
-                selectedBackgroundColor: Colors.black,
-                selectedForegroundColor: Colors.white,
+              child: Row(
+                children: [
+                  for (final priority in Priority.values)
+                    Expanded(
+                      child: RadioListTile<Priority>(
+                        value: priority,
+                        activeColor: Colors.black,
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        visualDensity: VisualDensity.compact,
+                        title: Text(
+                          priority.name[0].toUpperCase() +
+                              priority.name.substring(1),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Divider(height: 2, thickness: 2, color: Colors.black),
+            const SizedBox(height: 16),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                shape: const RoundedRectangleBorder(),
+                alignment: Alignment.centerLeft,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+              ),
+              onPressed: _schedule,
+              child: const Text('Add task'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton(
+              style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.black,
                 side: const BorderSide(color: Colors.black),
                 shape: const RoundedRectangleBorder(),
+                alignment: Alignment.centerLeft,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
             ),
-          ),
-          const SizedBox(height: 16),
-          _fieldLabel('priority'),
-          RadioGroup<Priority>(
-            groupValue: _priority,
-            onChanged: (value) {
-              if (value != null) setState(() => _priority = value);
-            },
-            child: Row(
-              children: [
-                for (final priority in Priority.values)
-                  Expanded(
-                    child: RadioListTile<Priority>(
-                      value: priority,
-                      activeColor: Colors.black,
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      visualDensity: VisualDensity.compact,
-                      title: Text(
-                        priority.name[0].toUpperCase() +
-                            priority.name.substring(1),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Divider(height: 2, thickness: 2, color: Colors.black),
-          const SizedBox(height: 16),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.black,
-              foregroundColor: Colors.white,
-              shape: const RoundedRectangleBorder(),
-              alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-            ),
-            onPressed: _schedule,
-            child: const Text('Add task'),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.black,
-              side: const BorderSide(color: Colors.black),
-              shape: const RoundedRectangleBorder(),
-              alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-            ),
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

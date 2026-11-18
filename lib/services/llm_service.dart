@@ -134,6 +134,8 @@ Today is $weekday $today and the time is ${formatTime(now)}.
 
 Respond only with JSON with exactly these keys:
 - "title": short name of the task, as a string
+- "description": optional details, as a string or null
+- "location": optional location, as a string or null
 - "length_minutes": total time for the whole task as a number, null if not said
 - "split_minutes": length of one block as a number, null if not said
 - "earliest_start": when it can start at the earliest, null if not said
@@ -151,5 +153,6 @@ Rules:
 - Repeated tasks like "Gym 3x" are 3 blocks. Use one hour per block if the time
   is not said, so split_minutes is 60 and length_minutes is 180.
 - If the task is at an exact time, put that time in earliest_start.
+- Missing optional fields must be null (or an empty string for description).
 ''';
 }

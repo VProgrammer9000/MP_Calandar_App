@@ -14,16 +14,18 @@ const _splitOptions = <Duration?>[
 ];
 
 // 1h: add a task by filling in every field yourself
-class AddByForm extends StatefulWidget {
-  const AddByForm({super.key});
+class AddTaskForm extends StatefulWidget {
+  const AddTaskForm({super.key});
 
   @override
-  State<AddByForm> createState() => _AddByFormState();
+  State<AddTaskForm> createState() => _AddTaskFormState();
 }
 
-class _AddByFormState extends State<AddByForm> {
+class _AddTaskFormState extends State<AddTaskForm> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _locationController = TextEditingController();
   final _startController = TextEditingController();
   final _deadlineController = TextEditingController();
   final _lengthController = TextEditingController();
@@ -38,6 +40,8 @@ class _AddByFormState extends State<AddByForm> {
   @override
   void dispose() {
     _titleController.dispose();
+    _descriptionController.dispose();
+    _locationController.dispose();
     _startController.dispose();
     _deadlineController.dispose();
     _lengthController.dispose();
@@ -87,6 +91,10 @@ class _AddByFormState extends State<AddByForm> {
 
     final task = TaskDraft(
       title: _titleController.text.trim(),
+      description: _descriptionController.text.trim(),
+      location: _locationController.text.trim().isEmpty
+          ? null
+          : _locationController.text.trim(),
       earliestStart: _earliestStart,
       deadline: _deadline,
       length: _parseLength(_lengthController.text),
@@ -95,7 +103,6 @@ class _AddByFormState extends State<AddByForm> {
       fixed: _fixed,
       priority: _priority,
     );
-    // TODO: give the task to the scheduler so it finds free slots
     Navigator.pop(context, task);
   }
 
@@ -114,6 +121,19 @@ class _AddByFormState extends State<AddByForm> {
             validator: (value) => value == null || value.trim().isEmpty
                 ? 'Give it a title'
                 : null,
+          ),
+          const SizedBox(height: 16),
+          _fieldLabel('description'),
+          TextFormField(
+            controller: _descriptionController,
+            maxLines: 2,
+            decoration: _inputDecoration(),
+          ),
+          const SizedBox(height: 16),
+          _fieldLabel('location'),
+          TextFormField(
+            controller: _locationController,
+            decoration: _inputDecoration(hintText: 'Room 310, Library, Online'),
           ),
           const SizedBox(height: 16),
           Row(
@@ -175,7 +195,9 @@ class _AddByFormState extends State<AddByForm> {
                       ),
                       decoration: _inputDecoration(suffixText: 'h'),
                       validator: (value) {
-                        if (value == null || value.trim().isEmpty) return null;
+                        if (value == null || value.trim().isEmpty) {
+                          return null;
+                        }
                         return _parseLength(value) == null
                             ? 'Hours, like 1.5'
                             : null;
@@ -302,7 +324,7 @@ class _AddByFormState extends State<AddByForm> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
             ),
             onPressed: _schedule,
-            child: const Text('Schedule it'),
+            child: const Text('Add task'),
           ),
           const SizedBox(height: 10),
           OutlinedButton(
@@ -331,11 +353,16 @@ class _AddByFormState extends State<AddByForm> {
     );
   }
 
-  InputDecoration _inputDecoration({String? suffixText, Widget? suffixIcon}) {
+  InputDecoration _inputDecoration({
+    String? suffixText,
+    Widget? suffixIcon,
+    String? hintText,
+  }) {
     return InputDecoration(
       isDense: true,
       suffixText: suffixText,
       suffixIcon: suffixIcon,
+      hintText: hintText,
       border: const OutlineInputBorder(borderRadius: BorderRadius.zero),
       focusedBorder: const OutlineInputBorder(
         borderRadius: BorderRadius.zero,

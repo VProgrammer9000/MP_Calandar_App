@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 
-import '../widgets/add_by_form.dart';
+import '../widgets/add_task_form.dart';
+import '../widgets/add_event_form.dart';
 import '../widgets/add_by_prompt.dart';
 
 enum AddMode { prompt, form }
 
+enum AddType { task, event }
+
 // "Add to my week", lets the user add a task by text prompt or by form
 class AddTaskScreen extends StatefulWidget {
-  const AddTaskScreen({super.key});
+  final AddType type;
+
+  const AddTaskScreen({
+    super.key,
+    this.type = AddType.task,
+  });
 
   @override
   State<AddTaskScreen> createState() => _AddTaskScreenState();
@@ -51,8 +59,12 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             ),
             Expanded(
               child: _mode == AddMode.prompt
-                  ? const AddByPrompt()
-                  : const AddByForm(),
+                  ? (widget.type == AddType.event
+                      ? const AddEventForm()
+                      : const AddByPrompt())
+                  : (widget.type == AddType.event
+                      ? const AddEventForm()
+                      : const AddTaskForm()),
             ),
           ],
         ),

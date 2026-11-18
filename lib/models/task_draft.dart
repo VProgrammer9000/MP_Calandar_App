@@ -2,10 +2,20 @@ import 'task_label.dart';
 
 enum Priority { high, normal, low }
 
+int _nextId = 0;
+
+String newModelId(String prefix) {
+  _nextId++;
+  return '$prefix-${DateTime.now().microsecondsSinceEpoch}-$_nextId';
+}
+
 // A task before it is placed in the calendar, filled in by the form or read
 // from the text prompt
 class TaskDraft {
+  final String? id;
   final String title;
+  final String description;
+  final String? location;
   final DateTime? earliestStart;
   final DateTime? deadline;
   final Duration? length;
@@ -16,7 +26,10 @@ class TaskDraft {
   final Priority priority;
 
   const TaskDraft({
+    this.id,
     required this.title,
+    this.description = '',
+    this.location,
     this.earliestStart,
     this.deadline,
     this.length,
@@ -25,6 +38,20 @@ class TaskDraft {
     this.fixed = false,
     this.priority = Priority.normal,
   });
+
+  TaskDraft withId(String id) => TaskDraft(
+        id: id,
+        title: title,
+        description: description,
+        location: location,
+        earliestStart: earliestStart,
+        deadline: deadline,
+        length: length,
+        splitInto: splitInto,
+        label: label,
+        fixed: fixed,
+        priority: priority,
+      );
 
   // made from the JSON the LLM answers with. It can give back anything, so
   // values that don't make sense are ignored
@@ -35,7 +62,10 @@ class TaskDraft {
     }
 
     return TaskDraft(
+      id: json['id'] is String ? json['id'] : null,
       title: title.trim(),
+      description: json['description'] is String ? json['description'] : '',
+      location: json['location'] is String ? json['location'] : null,
       earliestStart: _readDate(json['earliest_start']),
       deadline: _readDate(json['deadline']),
       length: _readMinutes(json['length_minutes']),

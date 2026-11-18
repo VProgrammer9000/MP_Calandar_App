@@ -53,7 +53,8 @@ class _TasksScreenState extends State<TasksScreen> {
     );
     if (draft is TaskDraft) {
       setState(() {
-        myTasks.insert(0, Task.fromDraft(draft));
+        final task = Task.fromDraft(draft);
+        myTasks.insert(0, task);
       });
     }
   }
@@ -223,6 +224,10 @@ class _TasksScreenState extends State<TasksScreen> {
             if (task.description.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(task.description, style: const TextStyle(color: Colors.grey)),
+            ],
+            if (task.location != null && task.location!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(task.location!, style: const TextStyle(color: Colors.grey)),
             ],
             const SizedBox(height: 8),
             // Wrap so the tags go to a new line on small screens

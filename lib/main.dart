@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'screens/onboarding_screen.dart';
+import 'services/storage_service.dart';
 
-void main() {
+Future<void> main() async {
+  // needed before reading files when the app starts
+  WidgetsFlutterBinding.ensureInitialized();
+  await loadData();
   runApp(const ChronoApp());
 }
 

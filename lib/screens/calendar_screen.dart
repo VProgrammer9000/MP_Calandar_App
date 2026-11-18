@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/sample_data.dart';
 import '../models/calendar_event.dart';
+import '../services/storage_service.dart';
 import '../utils/dates.dart';
 import '../widgets/calendar_pager.dart';
 import '../widgets/day_timeline.dart';
@@ -97,6 +98,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           final index = _events.indexOf(event);
           if (index != -1) _events[index] = updated;
         });
+        saveData();
       },
       onDelete: () => _deleteEvent(event),
       // TODO: open smart reschedule (1j)
@@ -117,11 +119,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
     // The add screen updates myEvents in calendar mode.
     setState(() {});
+    saveData();
   }
 
   void _deleteEvent(CalendarEvent event) {
     final index = _events.indexOf(event);
     setState(() => _events.remove(event));
+    saveData();
 
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -129,7 +133,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
         content: Text('Deleted "${event.title}"'),
         action: SnackBarAction(
           label: 'Undo',
-          onPressed: () => setState(() => _events.insert(index, event)),
+          onPressed: () {
+            setState(() => _events.insert(index, event));
+            saveData();
+          },
         ),
       ),
     );

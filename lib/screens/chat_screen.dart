@@ -6,6 +6,7 @@ import '../models/calendar_change.dart';
 import '../models/calendar_event.dart';
 import '../services/chat_service.dart';
 import '../services/llm_service.dart';
+import '../services/storage_service.dart';
 import '../utils/dates.dart';
 
 enum PreviewTab { calendar, changes }
@@ -371,7 +372,10 @@ class _ChangePreviewScreenState extends State<ChangePreviewScreen> {
 
   // goes back to the chat and tells it if the changes were accepted
   void _finish(bool accepted) {
-    if (accepted) applyChanges(_plan.changes, myEvents);
+    if (accepted) {
+      applyChanges(_plan.changes, myEvents);
+      saveData();
+    }
     final messenger = ScaffoldMessenger.of(context);
     Navigator.of(context).pop((accepted, _plan));
     messenger.showSnackBar(SnackBar(

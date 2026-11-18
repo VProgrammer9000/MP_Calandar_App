@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/sample_data.dart';
 import '../models/task.dart';
 import '../models/task_draft.dart';
+import '../services/storage_service.dart';
 import '../utils/dates.dart';
 import 'add_task_screen.dart';
 
@@ -56,6 +57,7 @@ class _TasksScreenState extends State<TasksScreen> {
         final task = Task.fromDraft(draft);
         myTasks.insert(0, task);
       });
+      saveData();
     }
   }
 
@@ -64,6 +66,7 @@ class _TasksScreenState extends State<TasksScreen> {
     setState(() {
       myTasks.remove(task);
     });
+    saveData();
 
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -75,6 +78,7 @@ class _TasksScreenState extends State<TasksScreen> {
             setState(() {
               myTasks.insert(index, task);
             });
+            saveData();
           },
         ),
       ),
@@ -207,6 +211,7 @@ class _TasksScreenState extends State<TasksScreen> {
           setState(() {
             task.done = value ?? false;
           });
+          saveData();
         },
         title: Text(
           task.title,

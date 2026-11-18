@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import '../data/sample_data.dart';
 import '../models/calendar_event.dart';
+import '../services/chat_service.dart';
+import '../services/llm_service.dart';
 import '../services/storage_service.dart';
 import '../utils/dates.dart';
 import '../widgets/calendar_pager.dart';
@@ -11,11 +14,15 @@ import '../widgets/month_grid.dart';
 import '../widgets/week_day_strip.dart';
 import '../widgets/week_timeline.dart';
 import 'add_task_screen.dart';
+import 'chat_screen.dart';
 
 enum CalendarView { day, week, month }
 
 class CalendarScreen extends StatefulWidget {
-  const CalendarScreen({super.key});
+  // only used by the tests, so they don't call the real API
+  final http.Client? client;
+
+  const CalendarScreen({super.key, this.client});
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
@@ -73,8 +80,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
   // TODO: load the user's events, sample events for now
   final List<CalendarEvent> _events = myEvents;
 
-  // TODO: filled in by the smart rescheduler, banner is hidden while null
+  // shown in the red banner while rescheduling, hidden while null
   String? _rescheduleMessage;
+  bool _rescheduling = false;
+  // the new plan from the assistant, kept so REVIEW can open it again
+  ChatPlan? _reschedulePlan;
+  List<Map<String, String>> _rescheduleHistory = [];
 
   List<CalendarEvent> _eventsFor(DateTime day) =>
       _events.where((e) => isSameDay(e.start, day)).toList();
@@ -101,13 +112,98 @@ class _CalendarScreenState extends State<CalendarScreen> {
         saveData();
       },
       onDelete: () => _deleteEvent(event),
-      // TODO: open smart reschedule (1j)
-      onReschedule: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Smart reschedule is not ready yet')),
-        );
-      },
+      onReschedule: () => _reschedule(event),
     );
+  }
+
+  void _showMessage(String text) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  // what we ask the assistant when the user taps Reschedule (1j)
+  String _rescheduleRequest(CalendarEvent event) {
+    final now = '${formatShortDate(event.start)} '
+        '${formatTime(event.start)}-${formatTime(event.end)}';
+    var request = 'Find a new time for "${event.title}" (now $now). '
+        'Keep the same length.';
+    if (event.windowStart != null && event.windowEnd != null) {
+      request += ' Pick a time between '
+          '${formatShortDate(event.windowStart!)} ${formatTime(event.windowStart!)} and '
+          '${formatShortDate(event.windowEnd!)} ${formatTime(event.windowEnd!)}, '
+          'not in the past.';
+    } else {
+      request += ' Pick a time in the next 7 days, not in the past.';
+    }
+    return request;
+  }
+
+  Future<void> _reschedule(CalendarEvent event) async {
+    if (event.fixed) {
+      _showMessage('Fixed events can\'t be moved');
+      return;
+    }
+    if (_rescheduling) return;
+
+    final request = _rescheduleRequest(event);
+    setState(() {
+      _rescheduling = true;
+      _reschedulePlan = null;
+      _rescheduleMessage = 'Finding a new time for "${event.title}"';
+    });
+
+    try {
+      final plan = await planChanges(request, _events, client: widget.client);
+      if (!mounted) return;
+      if (plan.changes.isEmpty) {
+        // the assistant could not find a time, the reply says why
+        setState(() {
+          _rescheduling = false;
+          _rescheduleMessage = null;
+        });
+        _showMessage(plan.reply);
+        return;
+      }
+      setState(() {
+        _rescheduling = false;
+        _reschedulePlan = plan;
+        _rescheduleHistory = [
+          {'role': 'user', 'content': request},
+          {'role': 'assistant', 'content': plan.reply},
+        ];
+        _rescheduleMessage = 'A new time for "${event.title}" is ready';
+      });
+      await _openReschedulePlan();
+    } on LlmException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _rescheduling = false;
+        _rescheduleMessage = null;
+      });
+      _showMessage(e.message);
+    }
+  }
+
+  // the review page from the chat, with Accept / Reject and refine
+  Future<void> _openReschedulePlan() async {
+    final result = await Navigator.push<(bool, ChatPlan)>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChangePreviewScreen(
+          plan: _reschedulePlan!,
+          history: _rescheduleHistory,
+          client: widget.client,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      // going back without deciding keeps the banner, so it can be reviewed later
+      if (result != null) {
+        _reschedulePlan = null;
+        _rescheduleMessage = null;
+      }
+    });
   }
 
   Future<void> _openAddTask() async {
@@ -355,12 +451,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
-            // TODO: open smart reschedule (1j)
-            onPressed: () {},
-            child: const Text('REVIEW'),
-          ),
+          if (_rescheduling)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+              onPressed: _openReschedulePlan,
+              child: const Text('REVIEW'),
+            ),
         ],
       ),
     );

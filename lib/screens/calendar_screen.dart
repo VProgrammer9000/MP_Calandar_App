@@ -180,13 +180,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 onPointerUp: _onPointerUp,
                 onPointerCancel: _onPointerUp,
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
+                  duration: const Duration(milliseconds: 220),
                   switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  layoutBuilder: (current, previous) => Stack(
-                    fit: StackFit.expand,
-                    children: [...previous, if (current != null) current],
-                  ),
+                  // only the new view is shown and animated, the old one is
+                  // dropped right away. Animating two whole calendars at
+                  // once made the switch lag on slower tablets
+                  layoutBuilder: (current, previous) =>
+                      current ?? const SizedBox(),
                   transitionBuilder: _zoomTransition,
                   child: KeyedSubtree(
                     key: ValueKey(_view),
@@ -208,18 +208,33 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  // zooming in (month -> week -> day) the new view grows into place and the
-  // old one grows away, zooming out it is the other way around
+  // zooming in (month -> week -> day) the new view grows into place,
+  // zooming out it shrinks into place.
+  // It looks like a fade, but making a whole calendar see-through is slow on
+  // tablets, so a white layer on top fades away instead (the page is white).
+  // The RepaintBoundary keeps the view drawn once while it scales.
   Widget _zoomTransition(Widget child, Animation<double> animation) {
-    final incoming = child.key == ValueKey(_view);
-    final zoomingIn = _direction == 1;
-    final from = incoming == zoomingIn ? 0.92 : 1.08;
+    final from = _direction == 1 ? 0.96 : 1.04;
 
-    return FadeTransition(
-      opacity: animation,
-      child: ScaleTransition(
-        scale: Tween(begin: from, end: 1.0).animate(animation),
-        child: child,
+    return ScaleTransition(
+      scale: Tween(begin: from, end: 1.0).animate(animation),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          RepaintBoundary(child: child),
+          IgnorePointer(
+            child: AnimatedBuilder(
+              animation: animation,
+              builder: (context, _) => animation.value == 1
+                  ? const SizedBox()
+                  : ColoredBox(
+                      color: Colors.white.withValues(
+                        alpha: 1 - animation.value,
+                      ),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }

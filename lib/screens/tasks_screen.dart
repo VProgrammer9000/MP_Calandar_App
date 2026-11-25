@@ -90,8 +90,10 @@ class _TasksScreenState extends State<TasksScreen> {
           onPressed: () {
             setState(() {
               myTasks.insert(index, task);
+              appearingTasks.add(task);
             });
             saveData();
+            forgetAppearing(task);
           },
         ),
       ),

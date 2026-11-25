@@ -6,6 +6,7 @@ import '../models/task_draft.dart';
 import '../services/storage_service.dart';
 import '../utils/dates.dart';
 import '../widgets/fade_slide_in.dart';
+import '../widgets/sliding_text.dart';
 import 'add_task_screen.dart';
 
 class TasksScreen extends StatefulWidget {
@@ -123,7 +124,9 @@ class _TasksScreenState extends State<TasksScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  // slides to the new numbers when a task is checked off,
+                  // added or deleted
+                  SlidingText(
                     '$openCount OPEN · ${openMinutes ~/ 60} H TO PLACE',
                     style: const TextStyle(
                       fontSize: 12,

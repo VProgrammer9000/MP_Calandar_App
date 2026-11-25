@@ -8,6 +8,7 @@ import '../widgets/calendar_pager.dart';
 import '../widgets/day_timeline.dart';
 import '../widgets/event_detail_sheet.dart';
 import '../widgets/month_grid.dart';
+import '../widgets/sliding_text.dart';
 import '../widgets/week_day_strip.dart';
 import '../widgets/week_timeline.dart';
 import 'add_task_screen.dart';
@@ -25,6 +26,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
   final _today = dateOnly(DateTime.now());
   late DateTime _selectedDay = _today;
   CalendarView _view = CalendarView.day;
+  // 1 when the last change went forward in time, -1 when it went back,
+  // so the header can slide the right way
+  int _direction = 1;
 
   // fingers on the screen, used to detect a pinch
   final Map<int, Offset> _pointers = {};
@@ -32,7 +36,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
   double? _pinchStartDistance;
 
   void _goToDay(DateTime day) {
-    setState(() => _selectedDay = day);
+    setState(() {
+      if (!isSameDay(day, _selectedDay)) {
+        _direction = day.isAfter(_selectedDay) ? 1 : -1;
+      }
+      _selectedDay = day;
+    });
   }
 
   double _pointerDistance() =>
@@ -284,8 +293,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          SlidingText(
             _headerLabel(),
+            direction: _direction,
             style: const TextStyle(
               fontSize: 12,
               letterSpacing: 1,
@@ -293,8 +303,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
+          SlidingText(
             _headerTitle(),
+            direction: _direction,
             style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w500),
           ),
         ],

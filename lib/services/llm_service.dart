@@ -11,9 +11,17 @@ import '../utils/dates.dart';
 // Never write the key in the code because the repo is public.
 const openRouterApiKey = String.fromEnvironment('OPENROUTER_API_KEY');
 const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
-// This picks one of the free models for us, so we pay nothing and it keeps
-// working when a free model gets removed
-const llmModel = 'openrouter/free';
+// A fast free model that can answer in JSON and doesn't think out loud first.
+// openrouter/free picked a random one, and the slow ones often took over a
+// minute.
+const llmModel = 'google/gemma-4-26b-a4b-it:free';
+// OpenRouter tries these in order if the one before is down or busy. The last
+// one picks any free model, so it is never worse than before. OpenRouter takes
+// at most 3 models in total, with llmModel counted.
+const llmFallbackModels = [
+  'google/gemma-4-31b-it:free',
+  'openrouter/free',
+];
 
 // Has a message that is ok to show to the user
 class LlmException implements Exception {
@@ -38,6 +46,7 @@ Future<String> askLlm(
 
   final body = <String, dynamic>{
     'model': llmModel,
+    'models': [llmModel, ...llmFallbackModels],
     'messages': messages,
     'temperature': 0.2,
   };

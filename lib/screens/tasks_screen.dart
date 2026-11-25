@@ -128,21 +128,42 @@ class _TasksScreenState extends State<TasksScreen> {
             buildFilterRow(),
             Divider(height: 1, color: Colors.grey.shade300),
             Expanded(
-              child: tasks.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No tasks here',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    )
-                  : ListView.separated(
-                      itemCount: tasks.length,
-                      separatorBuilder: (context, index) =>
-                          Divider(height: 1, color: Colors.grey.shade300),
-                      itemBuilder: (context, index) {
-                        return buildTaskTile(tasks[index]);
-                      },
-                    ),
+              // the list fades in when the filter changes. The old list is
+              // dropped right away so the two don't blur into each other
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                switchInCurve: Curves.easeOut,
+                layoutBuilder: (current, previous) =>
+                    current ?? const SizedBox(),
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween(
+                      begin: const Offset(0, 0.02),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                ),
+                child: KeyedSubtree(
+                  key: ValueKey(selectedFilter),
+                  child: tasks.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'No tasks here',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: tasks.length,
+                          separatorBuilder: (context, index) =>
+                              Divider(height: 1, color: Colors.grey.shade300),
+                          itemBuilder: (context, index) {
+                            return buildTaskTile(tasks[index]);
+                          },
+                        ),
+                ),
+              ),
             ),
           ],
         ),

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -797,13 +799,19 @@ class _WeekPreviewState extends State<_WeekPreview>
                             color: Colors.grey.shade300,
                           ),
                         ),
-                      // the changed blocks last, so they are drawn on top
-                      for (final block in [
-                        ...blocks.where((b) => !_isChange(b)),
-                        ...blocks.where(_isChange),
+                      // the outlines of the old times go under everything,
+                      // and the changed blocks last so they are on top
+                      for (final (block, outline) in [
+                        for (final b in blocks)
+                          if (b.movedFrom != null) (b, true),
+                        for (final b in blocks)
+                          if (!_isChange(b)) (b, false),
+                        for (final b in blocks)
+                          if (_isChange(b)) (b, false),
                       ])
                         _PreviewEvent(
                           block: block,
+                          outline: outline,
                           column: days.indexOf(dateOnly(block.start)),
                           oldColumn: block.movedFrom == null
                               ? null
@@ -848,6 +856,8 @@ class _PreviewEvent extends StatelessWidget {
   final Animation<double> animation;
   // -1 if the block is not a new event
   final int addIndex;
+  // true to only draw where a moved event was before
+  final bool outline;
 
   const _PreviewEvent({
     required this.block,
@@ -859,6 +869,7 @@ class _PreviewEvent extends StatelessWidget {
     required this.firstHour,
     required this.animation,
     required this.addIndex,
+    this.outline = false,
   });
 
   // the moves play first, after the page has slid in
@@ -916,13 +927,37 @@ class _PreviewEvent extends StatelessWidget {
         columnWidth,
         height - 4,
       );
+      // only a faint outline stays at the old time, under the other blocks
+      if (outline) {
+        return Positioned.fromRect(
+          rect: oldRect,
+          child: FadeTransition(
+            opacity: CurvedAnimation(parent: animation, curve: _move),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(
+                border: Border.all(color: _color.withValues(alpha: .45)),
+              ),
+            ),
+          ),
+        );
+      }
+
       return AnimatedBuilder(
         animation: animation,
-        builder: (context, child) => Positioned.fromRect(
-          rect: Rect.lerp(oldRect, rect, _move.transform(animation.value))!,
-          child: child!,
-        ),
-        child: _box(),
+        builder: (context, _) {
+          final t = _move.transform(animation.value);
+          // 0 at the start and end of the move, 1 halfway, so the block is
+          // picked up, carried over the other blocks and put down again
+          final lift = sin(t * pi);
+          return Positioned.fromRect(
+            rect: Rect.lerp(oldRect, rect, t)!,
+            child: Transform.scale(
+              scale: 1 + .08 * lift,
+              child: _box(lift: lift),
+            ),
+          );
+        },
       );
     }
 
@@ -946,7 +981,8 @@ class _PreviewEvent extends StatelessWidget {
     return Positioned.fromRect(rect: rect, child: _box());
   }
 
-  Widget _box() {
+  // lift goes from 0 to 1 and gives the block a shadow while it is carried
+  Widget _box({double lift = 0}) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 2),
       padding: const EdgeInsets.all(3),
@@ -956,6 +992,14 @@ class _PreviewEvent extends StatelessWidget {
             ? Colors.grey.shade100
             : Color.alphaBlend(_color.withValues(alpha: .12), Colors.white),
         border: Border.all(color: _color, width: 1.5),
+        boxShadow: [
+          if (lift > 0)
+            BoxShadow(
+              color: Colors.black.withValues(alpha: .25 * lift),
+              blurRadius: 10 * lift,
+              offset: Offset(0, 4 * lift),
+            ),
+        ],
       ),
       child: Text(
         '${formatTime(block.start)} ${block.title}${_movedFromText()}',

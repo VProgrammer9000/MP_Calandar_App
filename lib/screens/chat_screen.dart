@@ -8,6 +8,8 @@ import '../services/chat_service.dart';
 import '../services/llm_service.dart';
 import '../services/storage_service.dart';
 import '../utils/dates.dart';
+import '../widgets/message_appear.dart';
+import '../widgets/typing_dots.dart';
 
 enum PreviewTab { calendar, changes }
 
@@ -74,6 +76,8 @@ void clearChat() => _messages.clear();
 class _ChatScreenState extends State<ChatScreen> {
   final _messageController = TextEditingController();
   bool _loading = false;
+  // the messages from before the screen was opened don't pop in again
+  late final _shownBefore = {..._messages};
 
   @override
   void dispose() {
@@ -182,15 +186,26 @@ class _ChatScreenState extends State<ChatScreen> {
                         'Hi! Tell me what you would like to add, move, or remove.',
                     isUser: false,
                   ),
-                  for (final message in _messages)
-                    _ChatBubble(
-                      text: message.text,
-                      isUser: message.isUser,
-                      showReviewButton: message.showReview,
-                      onReviewChanges: () => _openPreview(message),
+                  for (final (i, message) in _messages.indexed)
+                    // keyed by position, so a message that gets replaced after
+                    // a review keeps its state and doesn't pop in again
+                    MessageAppear(
+                      key: ValueKey(i),
+                      fromRight: message.isUser,
+                      animate: !_shownBefore.contains(message),
+                      child: _ChatBubble(
+                        text: message.text,
+                        isUser: message.isUser,
+                        showReviewButton: message.showReview,
+                        onReviewChanges: () => _openPreview(message),
+                      ),
                     ),
                   if (_loading)
-                    const _ChatBubble(text: 'Thinking...', isUser: false),
+                    const MessageAppear(
+                      key: ValueKey('thinking'),
+                      fromRight: false,
+                      child: _TypingBubble(),
+                    ),
                 ],
               ),
             ),
@@ -253,6 +268,28 @@ class _ChatBubble extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+// Looks like an answer from the assistant, with bouncing dots instead of text
+class _TypingBubble extends StatelessWidget {
+  const _TypingBubble();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          border: Border.all(color: Colors.grey),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: const TypingDots(),
       ),
     );
   }

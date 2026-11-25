@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/calendar_event.dart';
 import '../utils/dates.dart';
 import 'animated_event_stack.dart';
+import 'press_scale.dart';
 
 const double hourHeight = 64;
 const double hourLabelWidth = 44;
@@ -107,7 +108,7 @@ class _EventBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return PressScale(
       onTap: onTap,
       // TODO: long press to drag the block to another time
       onLongPress: () {},

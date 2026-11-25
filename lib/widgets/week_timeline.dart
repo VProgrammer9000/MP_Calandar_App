@@ -86,16 +86,33 @@ class _WeekTimelineState extends State<WeekTimeline> {
   }
 }
 
-class _WeekEventBlock extends StatelessWidget {
+class _WeekEventBlock extends StatefulWidget {
   final CalendarEvent event;
   final VoidCallback onTap;
 
   const _WeekEventBlock({required this.event, required this.onTap});
 
   @override
+  State<_WeekEventBlock> createState() => _WeekEventBlockState();
+}
+
+class _WeekEventBlockState extends State<_WeekEventBlock> {
+  // tells us when the button is pressed, so the block can shrink a little
+  final _states = WidgetStatesController();
+
+  @override
+  void dispose() {
+    _states.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onTap,
+    final event = widget.event;
+
+    final button = OutlinedButton(
+      statesController: _states,
+      onPressed: widget.onTap,
       style: OutlinedButton.styleFrom(
         padding: EdgeInsets.zero,
         minimumSize: Size.zero,
@@ -126,6 +143,17 @@ class _WeekEventBlock extends StatelessWidget {
           ),
         ],
       ),
+    );
+
+    return ValueListenableBuilder<Set<WidgetState>>(
+      valueListenable: _states,
+      builder: (context, states, child) => AnimatedScale(
+        scale: states.contains(WidgetState.pressed) ? 0.94 : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: child,
+      ),
+      child: button,
     );
   }
 }

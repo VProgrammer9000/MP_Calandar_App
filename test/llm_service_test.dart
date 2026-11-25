@@ -144,7 +144,7 @@ void main() {
     }
 
     expect(await errorFor(401), contains('API key'));
-    expect(await errorFor(429), contains('Too many requests'));
+    expect(await errorFor(429), contains('used all its free requests'));
     expect(await errorFor(500), contains('500'));
   });
 
@@ -187,4 +187,87 @@ void main() {
     final answer = await askLlm([], client: fakeLlm('Møde 회의'));
     expect(answer, 'Møde 회의');
   });
+
+  group('more than one key', () {
+    // the keys that hit their limit are remembered between requests
+    setUp(resetUsedUpKeys);
+
+    // Answers with the status set for each key, and keeps which keys were used
+    MockClient keyClient(
+        Map<String, http.Response> responses, List<String> used) {
+      return MockClient((request) async {
+        final key = request.headers['Authorization']!.substring(7);
+        used.add(key);
+        return responses[key] ?? fakeResponse('ok');
+      });
+    }
+
+    test('tries the next key when one has used up its requests', () async {
+      final used = <String>[];
+      final client = keyClient({'a': http.Response('{}', 429)}, used);
+
+      expect(await askLlm([], client: client, keys: ['a', 'b']), 'ok');
+      expect(used, ['a', 'b']);
+
+      // the used up key is skipped for the rest of the day
+      used.clear();
+      await askLlm([], client: client, keys: ['a', 'b']);
+      expect(used, ['b']);
+    });
+
+    test('a key that is not valid is skipped', () async {
+      final used = <String>[];
+      final client = keyClient({'a': http.Response('{}', 401)}, used);
+
+      expect(await askLlm([], client: client, keys: ['a', 'b']), 'ok');
+      expect(used, ['a', 'b']);
+    });
+
+    test('a busy model is not fixed by another key', () async {
+      final used = <String>[];
+      final busy = jsonEncode({
+        'error': {
+          'code': 429,
+          'metadata': {'provider_name': 'Google AI Studio'},
+        },
+      });
+      final client = keyClient({'a': http.Response(busy, 429)}, used);
+
+      await expectLater(
+        askLlm([], client: client, keys: ['a', 'b']),
+        throwsA(isA<LlmException>()
+            .having((e) => e.message, 'message', contains('busy'))),
+      );
+      expect(used, ['a']);
+    });
+
+    test('says so when all keys have used up their requests', () async {
+      final used = <String>[];
+      final client = keyClient({
+        'a': http.Response('{}', 429),
+        'b': http.Response('{}', 401),
+      }, used);
+      final limit = throwsA(isA<LlmException>().having(
+          (e) => e.message, 'message', contains('used all its free requests')));
+
+      await expectLater(askLlm([], client: client, keys: ['a', 'b']), limit);
+      expect(used, ['a', 'b']);
+
+      // no request is sent until tomorrow
+      used.clear();
+      await expectLater(askLlm([], client: client, keys: ['a', 'b']), limit);
+      expect(used, isEmpty);
+    });
+  });
+}
+
+http.Response fakeResponse(String answer) {
+  final body = jsonEncode({
+    'choices': [
+      {
+        'message': {'content': answer},
+      },
+    ],
+  });
+  return http.Response.bytes(utf8.encode(body), 200);
 }

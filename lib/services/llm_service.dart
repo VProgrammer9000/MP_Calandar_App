@@ -1,15 +1,38 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/task_draft.dart';
 import '../models/task_label.dart';
 import '../utils/dates.dart';
 
-// The key comes from the .env file when the app is started, see the README.
-// Never write the key in the code because the repo is public.
-const openRouterApiKey = String.fromEnvironment('OPENROUTER_API_KEY');
+// The keys come from the .env file when the app is built, see the README.
+// Never write a key in the code because the repo is public.
+// Each of us has a free account with 50 requests a day, so when one key has
+// used them up the next one is tried. Keys that are not set are left out.
+final openRouterApiKeys = const [
+  String.fromEnvironment('OPENROUTER_API_KEY'),
+  String.fromEnvironment('OPENROUTER_API_KEY_2'),
+  String.fromEnvironment('OPENROUTER_API_KEY_3'),
+  String.fromEnvironment('OPENROUTER_API_KEY_4'),
+].where((key) => key.isNotEmpty).toList();
+
+// Keys that hit their daily limit or are not valid, with the day (in UTC,
+// when OpenRouter resets the limit) so they are tried again the next day
+final _usedUpKeys = <String, DateTime>{};
+
+DateTime _todayUtc() {
+  final now = DateTime.now().toUtc();
+  return DateTime.utc(now.year, now.month, now.day);
+}
+
+bool _isUsedUp(String key) => _usedUpKeys[key] == _todayUtc();
+
+@visibleForTesting
+void resetUsedUpKeys() => _usedUpKeys.clear();
+
 const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
 // A fast free model that can answer in JSON and doesn't think out loud first.
 // openrouter/free picked a random one, and the slow ones often took over a
@@ -33,16 +56,36 @@ class LlmException implements Exception {
   String toString() => message;
 }
 
+// A 429 can mean our key used up its requests for today, or that the free
+// model is busy for everyone. Only the first one is fixed by another key.
+// OpenRouter says it was the model when the error comes from the provider.
+bool _isBusyUpstream(http.Response response) {
+  try {
+    final metadata = jsonDecode(response.body)['error']['metadata'];
+    return metadata is Map &&
+        (metadata['provider_name'] != null ||
+            '${metadata['limit_source']}'.contains('upstream'));
+  } catch (e) {
+    return false;
+  }
+}
+
 // Sends the messages to the LLM and gives back the text of its answer.
-// A client can be passed in so the tests don't call the real API.
+// A client and keys can be passed in so the tests don't call the real API.
 Future<String> askLlm(
   List<Map<String, String>> messages, {
   bool wantJson = false,
   http.Client? client,
+  List<String>? keys,
 }) async {
-  if (client == null && openRouterApiKey.isEmpty) {
+  final allKeys = keys ?? openRouterApiKeys;
+  if (client == null && allKeys.isEmpty) {
     throw LlmException('The API key is missing. See the README.');
   }
+  // the tests run without any keys
+  final keysToTry =
+      allKeys.isEmpty ? [''] : allKeys.where((key) => !_isUsedUp(key)).toList();
+  if (keysToTry.isEmpty) throw _allUsedUp();
 
   final body = <String, dynamic>{
     'model': llmModel,
@@ -58,23 +101,34 @@ Future<String> askLlm(
 
   final httpClient = client ?? http.Client();
   try {
-    // free models can be slow, some answers took over a minute when we tried
-    final response = await httpClient
-        .post(
-          Uri.parse(openRouterUrl),
-          headers: {
-            'Authorization': 'Bearer $openRouterApiKey',
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 120));
+    late http.Response response;
+    // if no key worked, the user is told about the limit before a bad key
+    var hitLimit = false;
+    for (final key in keysToTry) {
+      // free models can be slow, some answers took over a minute when we tried
+      response = await httpClient
+          .post(
+            Uri.parse(openRouterUrl),
+            headers: {
+              'Authorization': 'Bearer $key',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 120));
 
-    if (response.statusCode == 401) {
-      throw LlmException('The API key is not valid.');
+      if (response.statusCode == 429 && _isBusyUpstream(response)) {
+        throw LlmException(
+            'The free AI models are busy right now. Try again in a minute.');
+      }
+      if (response.statusCode != 401 && response.statusCode != 429) break;
+      // this key can't be used today, try the next one
+      if (response.statusCode == 429) hitLimit = true;
+      _usedUpKeys[key] = _todayUtc();
     }
-    if (response.statusCode == 429) {
-      throw LlmException('Too many requests. Try again later.');
+
+    if (response.statusCode == 401 || response.statusCode == 429) {
+      throw hitLimit ? _allUsedUp() : LlmException('The API key is not valid.');
     }
     if (response.statusCode != 200) {
       throw LlmException('The assistant had a problem '
@@ -105,6 +159,10 @@ Future<String> askLlm(
     }
   }
 }
+
+LlmException _allUsedUp() =>
+    LlmException('The assistant has used all its free requests for today. '
+        'Try again tomorrow.');
 
 // Asks the LLM to pick out the task details from what the user wrote
 Future<TaskDraft> readTaskFromPrompt(

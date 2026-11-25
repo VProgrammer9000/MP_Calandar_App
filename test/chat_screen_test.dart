@@ -428,7 +428,7 @@ void main() {
       await tester.tap(find.text('Preview changes'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Too many requests. Try again later.'), findsOneWidget);
+      expect(find.textContaining('used all its free requests'), findsOneWidget);
       expect(find.text('Wed 11 Nov 13:00–14:00'), findsOneWidget);
     });
   });
@@ -453,6 +453,6 @@ void main() {
     await send(tester, 'Hi');
     await tester.pumpAndSettle();
 
-    expect(find.text('Too many requests. Try again later.'), findsOneWidget);
+    expect(find.textContaining('used all its free requests'), findsOneWidget);
   });
 }

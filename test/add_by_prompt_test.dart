@@ -114,7 +114,7 @@ void main() {
     await tester.tap(find.text('Read it & find slots'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Too many requests'), findsOneWidget);
+    expect(find.textContaining('used all its free requests'), findsOneWidget);
     expect(find.text('WHAT IT READ'), findsNothing);
     expect(find.text('Read it & find slots'), findsOneWidget);
     expect(myEvents, isEmpty);

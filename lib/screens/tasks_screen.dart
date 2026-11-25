@@ -213,14 +213,35 @@ class _TasksScreenState extends State<TasksScreen> {
           });
           saveData();
         },
-        title: Text(
-          task.title,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            // done tasks are crossed out
-            color: task.done ? Colors.grey : Colors.black,
-            decoration: task.done ? TextDecoration.lineThrough : null,
+        // done tasks fade to grey and a line is drawn through the title
+        title: Align(
+          alignment: Alignment.centerLeft,
+          child: Stack(
+            children: [
+              Builder(
+                builder: (context) => AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                  style: DefaultTextStyle.of(context).style.copyWith(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: task.done ? Colors.grey : Colors.black,
+                      ),
+                  child: Text(task.title),
+                ),
+              ),
+              Positioned.fill(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: AnimatedFractionallySizedBox(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                    widthFactor: task.done ? 1 : 0,
+                    child: Container(height: 1.5, color: Colors.grey),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         subtitle: Column(

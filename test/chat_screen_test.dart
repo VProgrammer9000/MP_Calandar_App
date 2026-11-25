@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:chrono/data/sample_data.dart';
 import 'package:chrono/screens/chat_screen.dart';
+import 'package:chrono/widgets/typing_dots.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -105,12 +106,12 @@ void main() {
 
     await send(tester, 'Move the gym');
     expect(find.text('Move the gym'), findsOneWidget);
-    expect(find.text('Thinking...'), findsOneWidget);
+    expect(find.byType(TypingDots), findsOneWidget);
 
     wait.complete();
     await tester.pumpAndSettle();
 
-    expect(find.text('Thinking...'), findsNothing);
+    expect(find.byType(TypingDots), findsNothing);
     expect(find.text('I moved the gym one hour later.'), findsOneWidget);
     expect(find.text('Review changes'), findsOneWidget);
   });

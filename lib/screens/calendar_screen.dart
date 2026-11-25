@@ -76,7 +76,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _zoom(int step) {
     final index = (_view.index + step).clamp(0, CalendarView.values.length - 1);
-    setState(() => _view = CalendarView.values[index]);
+    _setView(CalendarView.values[index]);
+  }
+
+  // every change of view goes through here so the zoom goes the right way.
+  // Day is the most zoomed in, month the most zoomed out.
+  void _setView(CalendarView view, {DateTime? day}) {
+    setState(() {
+      if (view != _view) _direction = view.index < _view.index ? 1 : -1;
+      _view = view;
+      if (day != null) _selectedDay = day;
+    });
   }
 
   // TODO: load the user's events, sample events for now
@@ -169,7 +179,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 onPointerMove: _onPointerMove,
                 onPointerUp: _onPointerUp,
                 onPointerCancel: _onPointerUp,
-                child: _buildView(),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  layoutBuilder: (current, previous) => Stack(
+                    fit: StackFit.expand,
+                    children: [...previous, if (current != null) current],
+                  ),
+                  transitionBuilder: _zoomTransition,
+                  child: KeyedSubtree(
+                    key: ValueKey(_view),
+                    child: _buildView(),
+                  ),
+                ),
               ),
             ),
           ],
@@ -181,6 +204,22 @@ class _CalendarScreenState extends State<CalendarScreen> {
         shape: const RoundedRectangleBorder(),
         onPressed: _openAddTask,
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  // zooming in (month -> week -> day) the new view grows into place and the
+  // old one grows away, zooming out it is the other way around
+  Widget _zoomTransition(Widget child, Animation<double> animation) {
+    final incoming = child.key == ValueKey(_view);
+    final zoomingIn = _direction == 1;
+    final from = incoming == zoomingIn ? 0.92 : 1.08;
+
+    return FadeTransition(
+      opacity: animation,
+      child: ScaleTransition(
+        scale: Tween(begin: from, end: 1.0).animate(animation),
+        child: child,
       ),
     );
   }
@@ -216,10 +255,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 right: weekGridRightPadding,
               ),
               onDaySelected: (day) {
-                setState(() {
-                  _selectedDay = day;
-                  _view = CalendarView.day;
-                });
+                _setView(CalendarView.day, day: day);
               },
             ),
             const Divider(height: 1),
@@ -252,10 +288,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             today: _today,
             events: _eventsForMonth(day),
             onDayTap: (day) {
-              setState(() {
-                _selectedDay = day;
-                _view = CalendarView.day;
-              });
+              _setView(CalendarView.day, day: day);
             },
             // TODO: quick add a task on that day
             onDayLongPress: (day) {},
@@ -327,7 +360,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ],
             selected: {_view},
             onSelectionChanged: (selection) {
-              setState(() => _view = selection.first);
+              _setView(selection.first);
             },
             style: SegmentedButton.styleFrom(
               selectedBackgroundColor: Colors.black,

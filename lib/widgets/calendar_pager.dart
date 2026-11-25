@@ -28,8 +28,14 @@ class CalendarPager extends StatefulWidget {
 class _CalendarPagerState extends State<CalendarPager> {
   static const _startPage = 10000;
 
+  // pages further away than this are jumped to, sliding past them all
+  // would take too long
+  static const _maxSlidePages = 7;
+
   late final DateTime _startDate = widget.date;
   final _controller = PageController(initialPage: _startPage);
+  // true while we slide to a date that was picked outside the pager
+  bool _sliding = false;
 
   int _pageFor(DateTime d) {
     switch (widget.step) {
@@ -61,11 +67,23 @@ class _CalendarPagerState extends State<CalendarPager> {
   @override
   void didUpdateWidget(CalendarPager oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // date was changed from outside (chip or today button), so jump there
+    // date was changed from outside (chip or today button), so go there
     final target = _pageFor(widget.date);
-    if (_controller.hasClients && _controller.page?.round() != target) {
+    final current = _controller.hasClients ? _controller.page?.round() : null;
+    if (current == null || current == target) return;
+
+    if ((target - current).abs() > _maxSlidePages) {
       _controller.jumpToPage(target);
+      return;
     }
+    _sliding = true;
+    _controller
+        .animateToPage(
+          target,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOutCubic,
+        )
+        .whenComplete(() => _sliding = false);
   }
 
   @override
@@ -79,6 +97,8 @@ class _CalendarPagerState extends State<CalendarPager> {
     return PageView.builder(
       controller: _controller,
       onPageChanged: (page) {
+        // the pages we slide past are not the picked date
+        if (_sliding) return;
         final moved = page - _pageFor(widget.date);
         if (moved != 0) widget.onDateChanged(_move(widget.date, moved));
       },

@@ -58,7 +58,7 @@ Future<String> askLlm(
 
   final httpClient = client ?? http.Client();
   try {
-    // free models can be slow, some answers took over 20 seconds when we tried
+    // free models can be slow, some answers took over a minute when we tried
     final response = await httpClient
         .post(
           Uri.parse(openRouterUrl),
@@ -68,7 +68,7 @@ Future<String> askLlm(
           },
           body: jsonEncode(body),
         )
-        .timeout(const Duration(seconds: 60));
+        .timeout(const Duration(seconds: 120));
 
     if (response.statusCode == 401) {
       throw LlmException('The API key is not valid.');

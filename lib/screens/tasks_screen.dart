@@ -164,7 +164,9 @@ class _TasksScreenState extends State<TasksScreen> {
                   ),
                 ),
                 child: KeyedSubtree(
-                  key: ValueKey(selectedFilter),
+                  // also when the list becomes empty, so "No tasks here"
+                  // fades in after the last task is deleted
+                  key: ValueKey('$selectedFilter ${tasks.isEmpty}'),
                   child: tasks.isEmpty
                       ? const Center(
                           child: Text(

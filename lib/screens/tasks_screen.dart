@@ -5,6 +5,7 @@ import '../models/task.dart';
 import '../models/task_draft.dart';
 import '../services/storage_service.dart';
 import '../utils/dates.dart';
+import '../widgets/fade_slide_in.dart';
 import 'add_task_screen.dart';
 
 class TasksScreen extends StatefulWidget {
@@ -17,6 +18,8 @@ class TasksScreen extends StatefulWidget {
 class _TasksScreenState extends State<TasksScreen> {
   final filters = ['All', 'Flexible', 'Fixed', 'Due'];
   String selectedFilter = 'All';
+  // tasks that were just added, they fade in instead of popping up
+  final Set<Task> appearingTasks = {};
 
   // 360 -> "6h", 90 -> "1h 30m", 15 -> "15m"
   String formatLength(int minutes) {
@@ -53,12 +56,22 @@ class _TasksScreenState extends State<TasksScreen> {
       MaterialPageRoute(builder: (context) => const AddTaskScreen()),
     );
     if (draft is TaskDraft) {
+      final task = Task.fromDraft(draft);
       setState(() {
-        final task = Task.fromDraft(draft);
         myTasks.insert(0, task);
+        appearingTasks.add(task);
       });
       saveData();
+      forgetAppearing(task);
     }
+  }
+
+  // after the fade in the task is a normal row again, so it doesn't fade in
+  // a second time when the list is rebuilt
+  void forgetAppearing(Task task) {
+    Future.delayed(const Duration(milliseconds: 600), () {
+      appearingTasks.remove(task);
+    });
   }
 
   void deleteTask(Task task) {
@@ -223,76 +236,79 @@ class _TasksScreenState extends State<TasksScreen> {
         child: const Icon(Icons.delete_outline, color: Colors.white),
       ),
       onDismissed: (direction) => deleteTask(task),
-      child: CheckboxListTile(
-        value: task.done,
-        controlAffinity: ListTileControlAffinity.leading,
-        activeColor: Colors.black,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        onChanged: (value) {
-          setState(() {
-            task.done = value ?? false;
-          });
-          saveData();
-        },
-        // done tasks fade to grey and a line is drawn through the title
-        title: Align(
-          alignment: Alignment.centerLeft,
-          child: Stack(
-            children: [
-              Builder(
-                builder: (context) => AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOut,
-                  style: DefaultTextStyle.of(context).style.copyWith(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: task.done ? Colors.grey : Colors.black,
-                      ),
-                  child: Text(task.title),
-                ),
-              ),
-              Positioned.fill(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: AnimatedFractionallySizedBox(
+      child: FadeSlideIn(
+        animate: appearingTasks.contains(task),
+        child: CheckboxListTile(
+          value: task.done,
+          controlAffinity: ListTileControlAffinity.leading,
+          activeColor: Colors.black,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          onChanged: (value) {
+            setState(() {
+              task.done = value ?? false;
+            });
+            saveData();
+          },
+          // done tasks fade to grey and a line is drawn through the title
+          title: Align(
+            alignment: Alignment.centerLeft,
+            child: Stack(
+              children: [
+                Builder(
+                  builder: (context) => AnimatedDefaultTextStyle(
                     duration: const Duration(milliseconds: 250),
                     curve: Curves.easeOut,
-                    widthFactor: task.done ? 1 : 0,
-                    child: Container(height: 1.5, color: Colors.grey),
+                    style: DefaultTextStyle.of(context).style.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: task.done ? Colors.grey : Colors.black,
+                        ),
+                    child: Text(task.title),
                   ),
                 ),
+                Positioned.fill(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: AnimatedFractionallySizedBox(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOut,
+                      widthFactor: task.done ? 1 : 0,
+                      child: Container(height: 1.5, color: Colors.grey),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (task.description.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(task.description, style: const TextStyle(color: Colors.grey)),
+              ],
+              if (task.location != null && task.location!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(task.location!, style: const TextStyle(color: Colors.grey)),
+              ],
+              const SizedBox(height: 8),
+              // Wrap so the tags go to a new line on small screens
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  if (task.label != null) buildTag(task.label!, Colors.white),
+                  buildTag(task.fixed ? 'Fixed' : 'Flexible', Colors.grey.shade200),
+                  if (task.deadline != null)
+                    buildTag('Due ${formatShortDate(task.deadline!)}', Colors.white),
+                ],
               ),
             ],
           ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (task.description.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(task.description, style: const TextStyle(color: Colors.grey)),
-            ],
-            if (task.location != null && task.location!.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(task.location!, style: const TextStyle(color: Colors.grey)),
-            ],
-            const SizedBox(height: 8),
-            // Wrap so the tags go to a new line on small screens
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                if (task.label != null) buildTag(task.label!, Colors.white),
-                buildTag(task.fixed ? 'Fixed' : 'Flexible', Colors.grey.shade200),
-                if (task.deadline != null)
-                  buildTag('Due ${formatShortDate(task.deadline!)}', Colors.white),
-              ],
-            ),
-          ],
-        ),
-        secondary: Text(
-          formatLength(task.minutes),
-          style: const TextStyle(color: Colors.grey),
+          secondary: Text(
+            formatLength(task.minutes),
+            style: const TextStyle(color: Colors.grey),
+          ),
         ),
       ),
     );

@@ -5,6 +5,8 @@ import '../models/task.dart';
 import '../models/task_draft.dart';
 import '../services/storage_service.dart';
 import '../utils/dates.dart';
+import '../widgets/fade_slide_in.dart';
+import '../widgets/sliding_text.dart';
 import 'add_task_screen.dart';
 
 class TasksScreen extends StatefulWidget {
@@ -17,6 +19,8 @@ class TasksScreen extends StatefulWidget {
 class _TasksScreenState extends State<TasksScreen> {
   final filters = ['All', 'Flexible', 'Fixed', 'Due'];
   String selectedFilter = 'All';
+  // tasks that were just added, they fade in instead of popping up
+  final Set<Task> appearingTasks = {};
 
   // 360 -> "6h", 90 -> "1h 30m", 15 -> "15m"
   String formatLength(int minutes) {
@@ -53,12 +57,22 @@ class _TasksScreenState extends State<TasksScreen> {
       MaterialPageRoute(builder: (context) => const AddTaskScreen()),
     );
     if (draft is TaskDraft) {
+      final task = Task.fromDraft(draft);
       setState(() {
-        final task = Task.fromDraft(draft);
         myTasks.insert(0, task);
+        appearingTasks.add(task);
       });
       saveData();
+      forgetAppearing(task);
     }
+  }
+
+  // after the fade in the task is a normal row again, so it doesn't fade in
+  // a second time when the list is rebuilt
+  void forgetAppearing(Task task) {
+    Future.delayed(const Duration(milliseconds: 600), () {
+      appearingTasks.remove(task);
+    });
   }
 
   void deleteTask(Task task) {
@@ -77,8 +91,10 @@ class _TasksScreenState extends State<TasksScreen> {
           onPressed: () {
             setState(() {
               myTasks.insert(index, task);
+              appearingTasks.add(task);
             });
             saveData();
+            forgetAppearing(task);
           },
         ),
       ),
@@ -108,7 +124,9 @@ class _TasksScreenState extends State<TasksScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  // slides to the new numbers when a task is checked off,
+                  // added or deleted
+                  SlidingText(
                     '$openCount OPEN · ${openMinutes ~/ 60} H TO PLACE',
                     style: const TextStyle(
                       fontSize: 12,
@@ -128,21 +146,44 @@ class _TasksScreenState extends State<TasksScreen> {
             buildFilterRow(),
             Divider(height: 1, color: Colors.grey.shade300),
             Expanded(
-              child: tasks.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No tasks here',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    )
-                  : ListView.separated(
-                      itemCount: tasks.length,
-                      separatorBuilder: (context, index) =>
-                          Divider(height: 1, color: Colors.grey.shade300),
-                      itemBuilder: (context, index) {
-                        return buildTaskTile(tasks[index]);
-                      },
-                    ),
+              // the list fades in when the filter changes. The old list is
+              // dropped right away so the two don't blur into each other
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                switchInCurve: Curves.easeOut,
+                layoutBuilder: (current, previous) =>
+                    current ?? const SizedBox(),
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween(
+                      begin: const Offset(0, 0.02),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                ),
+                child: KeyedSubtree(
+                  // also when the list becomes empty, so "No tasks here"
+                  // fades in after the last task is deleted
+                  key: ValueKey('$selectedFilter ${tasks.isEmpty}'),
+                  child: tasks.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'No tasks here',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: tasks.length,
+                          separatorBuilder: (context, index) =>
+                              Divider(height: 1, color: Colors.grey.shade300),
+                          itemBuilder: (context, index) {
+                            return buildTaskTile(tasks[index]);
+                          },
+                        ),
+                ),
+              ),
             ),
           ],
         ),
@@ -202,55 +243,79 @@ class _TasksScreenState extends State<TasksScreen> {
         child: const Icon(Icons.delete_outline, color: Colors.white),
       ),
       onDismissed: (direction) => deleteTask(task),
-      child: CheckboxListTile(
-        value: task.done,
-        controlAffinity: ListTileControlAffinity.leading,
-        activeColor: Colors.black,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        onChanged: (value) {
-          setState(() {
-            task.done = value ?? false;
-          });
-          saveData();
-        },
-        title: Text(
-          task.title,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            // done tasks are crossed out
-            color: task.done ? Colors.grey : Colors.black,
-            decoration: task.done ? TextDecoration.lineThrough : null,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (task.description.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(task.description, style: const TextStyle(color: Colors.grey)),
-            ],
-            if (task.location != null && task.location!.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(task.location!, style: const TextStyle(color: Colors.grey)),
-            ],
-            const SizedBox(height: 8),
-            // Wrap so the tags go to a new line on small screens
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
+      child: FadeSlideIn(
+        animate: appearingTasks.contains(task),
+        child: CheckboxListTile(
+          value: task.done,
+          controlAffinity: ListTileControlAffinity.leading,
+          activeColor: Colors.black,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          onChanged: (value) {
+            setState(() {
+              task.done = value ?? false;
+            });
+            saveData();
+          },
+          // done tasks fade to grey and a line is drawn through the title
+          title: Align(
+            alignment: Alignment.centerLeft,
+            child: Stack(
               children: [
-                if (task.label != null) buildTag(task.label!, Colors.white),
-                buildTag(task.fixed ? 'Fixed' : 'Flexible', Colors.grey.shade200),
-                if (task.deadline != null)
-                  buildTag('Due ${formatShortDate(task.deadline!)}', Colors.white),
+                Builder(
+                  builder: (context) => AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                    style: DefaultTextStyle.of(context).style.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: task.done ? Colors.grey : Colors.black,
+                        ),
+                    child: Text(task.title),
+                  ),
+                ),
+                Positioned.fill(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: AnimatedFractionallySizedBox(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOut,
+                      widthFactor: task.done ? 1 : 0,
+                      child: Container(height: 1.5, color: Colors.grey),
+                    ),
+                  ),
+                ),
               ],
             ),
-          ],
-        ),
-        secondary: Text(
-          formatLength(task.minutes),
-          style: const TextStyle(color: Colors.grey),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (task.description.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(task.description, style: const TextStyle(color: Colors.grey)),
+              ],
+              if (task.location != null && task.location!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(task.location!, style: const TextStyle(color: Colors.grey)),
+              ],
+              const SizedBox(height: 8),
+              // Wrap so the tags go to a new line on small screens
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  if (task.label != null) buildTag(task.label!, Colors.white),
+                  buildTag(task.fixed ? 'Fixed' : 'Flexible', Colors.grey.shade200),
+                  if (task.deadline != null)
+                    buildTag('Due ${formatShortDate(task.deadline!)}', Colors.white),
+                ],
+              ),
+            ],
+          ),
+          secondary: Text(
+            formatLength(task.minutes),
+            style: const TextStyle(color: Colors.grey),
+          ),
         ),
       ),
     );

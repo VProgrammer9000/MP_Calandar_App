@@ -50,7 +50,13 @@ void main() {
     // closest deadline first
     final titles = tester
         .widgetList<CheckboxListTile>(find.byType(CheckboxListTile))
-        .map((tile) => (tile.title as Text).data)
+        // the title is the first text in the tile
+        .map((tile) => tester
+            .widget<Text>(find
+                .descendant(
+                    of: find.byWidget(tile), matching: find.byType(Text))
+                .first)
+            .data)
         .toList();
     expect(titles, [
       'Prepare slides for team meeting',

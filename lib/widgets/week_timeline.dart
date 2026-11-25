@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/calendar_event.dart';
 import '../utils/dates.dart';
+import 'animated_event_stack.dart';
 import 'day_timeline.dart';
 
 // space on the right of the grid, the day strip above uses the same
@@ -58,20 +59,24 @@ class _WeekTimelineState extends State<WeekTimeline> {
                     right: 0,
                     child: HourLine(hour: hour),
                   ),
-                for (final event in widget.events)
-                  Positioned(
-                    top: _minutesToY(event.start),
-                    height: _minutesToY(event.end) - _minutesToY(event.start),
-                    left: hourLabelWidth +
-                        daysBetween(widget.weekStart, event.start) *
-                            columnWidth +
-                        2,
-                    width: columnWidth - 4,
-                    child: _WeekEventBlock(
+                Positioned.fill(
+                  child: AnimatedEventStack(
+                    events: widget.events,
+                    rectFor: (event, size) => Rect.fromLTWH(
+                      hourLabelWidth +
+                          daysBetween(widget.weekStart, event.start) *
+                              columnWidth +
+                          2,
+                      _minutesToY(event.start),
+                      columnWidth - 4,
+                      _minutesToY(event.end) - _minutesToY(event.start),
+                    ),
+                    builder: (event) => _WeekEventBlock(
                       event: event,
                       onTap: () => widget.onEventTap(event),
                     ),
                   ),
+                ),
               ],
             );
           },

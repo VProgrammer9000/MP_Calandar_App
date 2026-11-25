@@ -478,7 +478,8 @@ class _ChangePreviewScreenState extends State<ChangePreviewScreen> {
                   ),
                   const SizedBox(height: 16),
                   if (_tab == PreviewTab.calendar)
-                    _WeekPreview(changes: _plan.changes)
+                    // a refined plan gets a new key, so its changes play again
+                    _WeekPreview(key: ObjectKey(_plan), changes: _plan.changes)
                   else
                     _ChangesList(changes: _plan.changes),
                   const SizedBox(height: 20),
@@ -584,6 +585,8 @@ class _PreviewBlock {
   // where a moved event was before, shown in its label
   final DateTime? movedFrom;
 
+  DateTime? get movedFromEnd => movedFrom?.add(end.difference(start));
+
   const _PreviewBlock(
     this.title,
     this.start,
@@ -674,30 +677,63 @@ Map<_PreviewBlock, (int, int)> _lanes(List<_PreviewBlock> blocks) {
 
 const _hourHeight = 42.0;
 
-class _WeekPreview extends StatelessWidget {
+// The preview plays the changes when it opens: moved events slide from their
+// old time to the new one, then the new events pop in one by one
+class _WeekPreview extends StatefulWidget {
   final List<CalendarChange> changes;
 
-  const _WeekPreview({required this.changes});
+  const _WeekPreview({super.key, required this.changes});
+
+  @override
+  State<_WeekPreview> createState() => _WeekPreviewState();
+}
+
+class _WeekPreviewState extends State<_WeekPreview>
+    with SingleTickerProviderStateMixin {
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2000),
+  )..forward();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final blocks = _previewBlocks(changes, myEvents);
-    final days = blocks.map((b) => dateOnly(b.start)).toSet().toList()..sort();
+    final blocks = _previewBlocks(widget.changes, myEvents);
+    // the old day of a moved event gets a column too, so it can slide from it
+    final days = {
+      for (final block in blocks) ...[
+        dateOnly(block.start),
+        if (block.movedFrom != null) dateOnly(block.movedFrom!),
+      ],
+    }.toList()
+      ..sort();
     if (days.isEmpty) return const SizedBox.shrink();
 
-    // only the hours that have something in them, but at least 3
+    // only the hours that have something in them, but at least 3. The old
+    // time of a moved event counts too, so it starts on the grid.
     var firstHour = 23;
     var lastHour = 0;
-    for (final block in blocks) {
-      if (block.start.hour < firstHour) firstHour = block.start.hour;
-      final endHour = block.end.minute == 0 && isSameDay(block.start, block.end)
-          ? block.end.hour
-          : block.end.hour + 1;
+    void fit(DateTime start, DateTime end) {
+      if (start.hour < firstHour) firstHour = start.hour;
+      final endHour =
+          end.minute == 0 && isSameDay(start, end) ? end.hour : end.hour + 1;
       if (endHour > lastHour) lastHour = endHour;
+    }
+
+    for (final block in blocks) {
+      fit(block.start, block.end);
+      if (block.movedFrom != null) fit(block.movedFrom!, block.movedFromEnd!);
     }
     if (lastHour - firstHour < 3) lastHour = firstHour + 3;
     final hours = lastHour - firstHour;
     final lanes = _lanes(blocks);
+    final added =
+        blocks.where((b) => b.type == _PreviewEventType.added).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -761,14 +797,24 @@ class _WeekPreview extends StatelessWidget {
                             color: Colors.grey.shade300,
                           ),
                         ),
-                      for (final block in blocks)
+                      // the changed blocks last, so they are drawn on top
+                      for (final block in [
+                        ...blocks.where((b) => !_isChange(b)),
+                        ...blocks.where(_isChange),
+                      ])
                         _PreviewEvent(
                           block: block,
                           column: days.indexOf(dateOnly(block.start)),
+                          oldColumn: block.movedFrom == null
+                              ? null
+                              : days.indexOf(dateOnly(block.movedFrom!)),
                           columnWidth: constraints.maxWidth / days.length,
                           lane: lanes[block]!.$1,
                           laneCount: lanes[block]!.$2,
                           firstHour: firstHour,
+                          animation: _controller,
+                          // the new events pop in one after the other
+                          addIndex: added.indexOf(block),
                         ),
                     ],
                   ),
@@ -784,23 +830,45 @@ class _WeekPreview extends StatelessWidget {
 
 enum _PreviewEventType { neutral, added, adjusted, deleted }
 
+bool _isChange(_PreviewBlock block) =>
+    block.type == _PreviewEventType.added ||
+    block.type == _PreviewEventType.adjusted;
+
 class _PreviewEvent extends StatelessWidget {
   final _PreviewBlock block;
   final int column;
+  // the column a moved event was in before
+  final int? oldColumn;
   final double columnWidth;
   // overlapping blocks share the column
   final int lane;
   final int laneCount;
   final int firstHour;
+  // goes from 0 to 1 once when the preview opens
+  final Animation<double> animation;
+  // -1 if the block is not a new event
+  final int addIndex;
 
   const _PreviewEvent({
     required this.block,
     required this.column,
+    required this.oldColumn,
     required this.columnWidth,
     required this.lane,
     required this.laneCount,
     required this.firstHour,
+    required this.animation,
+    required this.addIndex,
   });
+
+  // the moves play first, after the page has slid in
+  static const _move = Interval(.15, .55, curve: Curves.easeInOutCubic);
+
+  // each new event pops in a bit after the one before, once the moves are done
+  Curve get _pop {
+    final start = (.55 + addIndex * .08).clamp(0.0, .8);
+    return Interval(start, start + .2, curve: Curves.easeOutBack);
+  }
 
   Color get _color {
     switch (block.type) {
@@ -829,36 +897,74 @@ class _PreviewEvent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final top = _hoursFromTop(block.start) * _hourHeight;
     final height =
         block.end.difference(block.start).inMinutes / 60 * _hourHeight;
-
     final laneWidth = columnWidth / laneCount;
+    final rect = Rect.fromLTWH(
+      column * columnWidth + lane * laneWidth,
+      _hoursFromTop(block.start) * _hourHeight + 2,
+      laneWidth,
+      height - 4,
+    );
 
-    return Positioned(
-      top: top + 2,
-      left: column * columnWidth + lane * laneWidth,
-      width: laneWidth,
-      height: height - 4,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 2),
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          // solid colors, so nothing shows through from behind
-          color: block.type == _PreviewEventType.neutral
-              ? Colors.grey.shade100
-              : Color.alphaBlend(_color.withValues(alpha: .12), Colors.white),
-          border: Border.all(color: _color, width: 1.5),
+    // a moved event starts at its old time, with the whole column
+    final from = block.movedFrom;
+    if (from != null) {
+      final oldRect = Rect.fromLTWH(
+        oldColumn! * columnWidth,
+        _hoursFromTop(from) * _hourHeight + 2,
+        columnWidth,
+        height - 4,
+      );
+      return AnimatedBuilder(
+        animation: animation,
+        builder: (context, child) => Positioned.fromRect(
+          rect: Rect.lerp(oldRect, rect, _move.transform(animation.value))!,
+          child: child!,
         ),
-        child: Text(
-          '${formatTime(block.start)} ${block.title}${_movedFromText()}',
-          style: TextStyle(
-            color: _color,
-            fontSize: 9,
-            fontWeight: FontWeight.w600,
-          ),
-          overflow: TextOverflow.ellipsis,
+        child: _box(),
+      );
+    }
+
+    if (addIndex >= 0) {
+      return Positioned.fromRect(
+        rect: rect,
+        child: AnimatedBuilder(
+          animation: animation,
+          builder: (context, child) {
+            final t = _pop.transform(animation.value);
+            return Opacity(
+              opacity: t.clamp(0.0, 1.0),
+              child: Transform.scale(scale: .4 + .6 * t, child: child),
+            );
+          },
+          child: _box(),
         ),
+      );
+    }
+
+    return Positioned.fromRect(rect: rect, child: _box());
+  }
+
+  Widget _box() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        // solid colors, so nothing shows through from behind
+        color: block.type == _PreviewEventType.neutral
+            ? Colors.grey.shade100
+            : Color.alphaBlend(_color.withValues(alpha: .12), Colors.white),
+        border: Border.all(color: _color, width: 1.5),
+      ),
+      child: Text(
+        '${formatTime(block.start)} ${block.title}${_movedFromText()}',
+        style: TextStyle(
+          color: _color,
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+        ),
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

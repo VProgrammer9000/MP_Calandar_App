@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/calendar_event.dart';
 import '../utils/dates.dart';
+import 'press_scale.dart';
 
 const _maxBarsPerDay = 3;
 
@@ -140,8 +141,7 @@ class _MonthDayCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return PressScale(
       onTap: onTap,
       onLongPress: onLongPress,
       child: Container(

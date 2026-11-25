@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/calendar_event.dart';
 import '../utils/dates.dart';
+import 'animated_event_stack.dart';
 import 'day_timeline.dart';
 
 // space on the right of the grid, the day strip above uses the same
@@ -58,20 +59,24 @@ class _WeekTimelineState extends State<WeekTimeline> {
                     right: 0,
                     child: HourLine(hour: hour),
                   ),
-                for (final event in widget.events)
-                  Positioned(
-                    top: _minutesToY(event.start),
-                    height: _minutesToY(event.end) - _minutesToY(event.start),
-                    left: hourLabelWidth +
-                        daysBetween(widget.weekStart, event.start) *
-                            columnWidth +
-                        2,
-                    width: columnWidth - 4,
-                    child: _WeekEventBlock(
+                Positioned.fill(
+                  child: AnimatedEventStack(
+                    events: widget.events,
+                    rectFor: (event, size) => Rect.fromLTWH(
+                      hourLabelWidth +
+                          daysBetween(widget.weekStart, event.start) *
+                              columnWidth +
+                          2,
+                      _minutesToY(event.start),
+                      columnWidth - 4,
+                      _minutesToY(event.end) - _minutesToY(event.start),
+                    ),
+                    builder: (event) => _WeekEventBlock(
                       event: event,
                       onTap: () => widget.onEventTap(event),
                     ),
                   ),
+                ),
               ],
             );
           },
@@ -81,16 +86,33 @@ class _WeekTimelineState extends State<WeekTimeline> {
   }
 }
 
-class _WeekEventBlock extends StatelessWidget {
+class _WeekEventBlock extends StatefulWidget {
   final CalendarEvent event;
   final VoidCallback onTap;
 
   const _WeekEventBlock({required this.event, required this.onTap});
 
   @override
+  State<_WeekEventBlock> createState() => _WeekEventBlockState();
+}
+
+class _WeekEventBlockState extends State<_WeekEventBlock> {
+  // tells us when the button is pressed, so the block can shrink a little
+  final _states = WidgetStatesController();
+
+  @override
+  void dispose() {
+    _states.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onTap,
+    final event = widget.event;
+
+    final button = OutlinedButton(
+      statesController: _states,
+      onPressed: widget.onTap,
       style: OutlinedButton.styleFrom(
         padding: EdgeInsets.zero,
         minimumSize: Size.zero,
@@ -121,6 +143,17 @@ class _WeekEventBlock extends StatelessWidget {
           ),
         ],
       ),
+    );
+
+    return ValueListenableBuilder<Set<WidgetState>>(
+      valueListenable: _states,
+      builder: (context, states, child) => AnimatedScale(
+        scale: states.contains(WidgetState.pressed) ? 0.94 : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: child,
+      ),
+      child: button,
     );
   }
 }

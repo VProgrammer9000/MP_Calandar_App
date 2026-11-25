@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../models/calendar_event.dart';
 import '../utils/dates.dart';
+import 'animated_event_stack.dart';
+import 'press_scale.dart';
 
 const double hourHeight = 64;
 const double hourLabelWidth = 44;
@@ -50,17 +52,21 @@ class _DayTimelineState extends State<DayTimeline> {
                 right: 0,
                 child: HourLine(hour: hour),
               ),
-            for (final event in widget.events)
-              Positioned(
-                top: _minutesToY(event.start),
-                height: _minutesToY(event.end) - _minutesToY(event.start),
-                left: hourLabelWidth + 4,
-                right: 12,
-                child: _EventBlock(
+            Positioned.fill(
+              child: AnimatedEventStack(
+                events: widget.events,
+                rectFor: (event, size) => Rect.fromLTRB(
+                  hourLabelWidth + 4,
+                  _minutesToY(event.start),
+                  size.width - 12,
+                  _minutesToY(event.end),
+                ),
+                builder: (event) => _EventBlock(
                   event: event,
                   onTap: () => widget.onEventTap(event),
                 ),
               ),
+            ),
           ],
         ),
       ),
@@ -102,7 +108,7 @@ class _EventBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return PressScale(
       onTap: onTap,
       // TODO: long press to drag the block to another time
       onLongPress: () {},

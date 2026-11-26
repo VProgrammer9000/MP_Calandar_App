@@ -73,4 +73,24 @@ void main() {
     expect(find.text('한국어 (Korean)'), findsOneWidget);
     expect(savedFile()['language'], 'korean');
   });
+
+  testWidgets('a new name is saved and the dialog closes cleanly',
+      (tester) async {
+    await openSettings(tester);
+
+    await tester.tap(find.text('Your name'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Viktor');
+    await tester.tap(find.text('Save'));
+    await tester.runAsync(() => Future.delayed(
+          const Duration(milliseconds: 100),
+        ));
+    // the dialog closing must not use anything that was already thrown away
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(mySettings.value.name, 'Viktor');
+    expect(find.text('Viktor'), findsOneWidget);
+    expect(savedFile()['name'], 'Viktor');
+  });
 }

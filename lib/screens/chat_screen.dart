@@ -12,6 +12,7 @@ import '../services/llm_service.dart';
 import '../services/storage_service.dart';
 import '../utils/dates.dart';
 import '../widgets/message_appear.dart';
+import '../widgets/settings_summary.dart';
 import '../widgets/typing_dots.dart';
 
 enum PreviewTab { calendar, changes }
@@ -194,6 +195,20 @@ class _ChatScreenState extends State<ChatScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // the settings the assistant uses right now
+            SettingsSummary(
+              text: (settings) => [
+                settings.language == AssistantLanguage.korean
+                    ? 'Korean'
+                    : 'English',
+                settings.askBeforeChanging
+                    ? 'asks before changing'
+                    : 'changes right away',
+                '${formatMinutes(settings.workStartMinutes)}-'
+                    '${formatMinutes(settings.workEndMinutes)}',
+              ].join(' · '),
+            ),
+            const Divider(height: 1),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),

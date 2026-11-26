@@ -66,4 +66,25 @@ void main() {
     );
     expect(slots.first.end.difference(slots.first.start).inMinutes, 30);
   });
+
+  group('assistant', () {
+    test('uses the name and answers in the picked language', () {
+      final prompt = buildPlanPrompt(
+        now,
+        [],
+        settings: const AppSettings(
+          name: 'Viktor',
+          language: AssistantLanguage.korean,
+        ),
+      );
+      expect(prompt, contains('The user is called Viktor'));
+      expect(prompt, contains('Write "reply" in Korean'));
+    });
+
+    test('without a name it is left out, and English is the default', () {
+      final prompt = buildPlanPrompt(now, []);
+      expect(prompt, isNot(contains('The user is called')));
+      expect(prompt, contains('Write "reply" in English'));
+    });
+  });
 }

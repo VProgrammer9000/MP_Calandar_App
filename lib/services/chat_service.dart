@@ -102,10 +102,17 @@ String buildPlanPrompt(
   final lines = [
     for (var i = 0; i < events.length; i++) _describeEvent(i, events[i]),
   ].join('\n');
+  final name = settings.name.isEmpty
+      ? ''
+      : 'The user is called ${settings.name}. Use the name now and then.\n';
+  final language = settings.language == AssistantLanguage.korean
+      ? 'Korean'
+      : 'English';
 
   return '''
 You are the assistant in a calendar app. You help the user plan their week.
 Today is $weekday $today and the time is ${formatTime(now)}.
+${name}Write "reply" in $language. Everything else in the JSON stays as below.
 
 These are the events in the calendar, each with its number:
 $lines

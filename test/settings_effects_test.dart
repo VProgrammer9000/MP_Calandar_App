@@ -46,4 +46,24 @@ void main() {
       expect(prompt, contains('working hours are 09:00 to 17:30'));
     });
   });
+
+  test('a task without a length gets the default length', () {
+    final slots = findSlots(
+      const TaskDraft(title: 'Call mom'),
+      [],
+      now,
+      defaultTaskMinutes: 90,
+    );
+    expect(slots.first.end.difference(slots.first.start).inMinutes, 90);
+  });
+
+  test('a length the user gave wins over the default', () {
+    final slots = findSlots(
+      const TaskDraft(title: 'Call mom', length: Duration(minutes: 30)),
+      [],
+      now,
+      defaultTaskMinutes: 90,
+    );
+    expect(slots.first.end.difference(slots.first.start).inMinutes, 30);
+  });
 }

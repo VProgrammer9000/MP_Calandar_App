@@ -76,6 +76,7 @@ class _AddByPromptState extends State<AddByPrompt> {
         DateTime.now(),
         dayStartMinutes: settings.workStartMinutes,
         dayEndMinutes: settings.workEndMinutes,
+        defaultTaskMinutes: settings.defaultTaskMinutes,
       );
       if (!mounted) return;
       setState(() {

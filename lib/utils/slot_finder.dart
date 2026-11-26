@@ -20,9 +20,11 @@ List<CalendarEvent> findSlots(
   DateTime now, {
   int dayStartMinutes = dayStartHour * 60,
   int dayEndMinutes = dayEndHour * 60,
+  // used when the user didn't say how long the task takes
+  int defaultTaskMinutes = 60,
 }) {
   final taskId = task.id ?? newModelId('task');
-  final totalMinutes = task.length?.inMinutes ?? 60;
+  final totalMinutes = task.length?.inMinutes ?? defaultTaskMinutes;
 
   // A fixed task with a time stays at that time
   if (task.fixed && task.earliestStart != null) {

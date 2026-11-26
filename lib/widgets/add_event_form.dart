@@ -89,6 +89,7 @@ class _AddEventFormState extends State<AddEventForm> {
       DateTime.now(),
       dayStartMinutes: settings.workStartMinutes,
       dayEndMinutes: settings.workEndMinutes,
+      defaultTaskMinutes: settings.defaultTaskMinutes,
     ));
     Navigator.pop(context);
   }

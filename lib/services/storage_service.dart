@@ -5,11 +5,12 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../data/sample_data.dart';
+import '../models/app_settings.dart';
 import '../models/calendar_event.dart';
 import '../models/task.dart';
 
-// Saves the tasks and events as json files in the app documents folder,
-// so they are still there when the app is opened again.
+// Saves the tasks, events and settings as json files in the app documents
+// folder, so they are still there when the app is opened again.
 
 // only set by the tests, so they can use a temp folder
 Directory? storageFolder;
@@ -44,6 +45,31 @@ Future<void> loadData() async {
   } catch (e) {
     // a broken file should not stop the app from starting
     debugPrint('Could not load the saved data: $e');
+  }
+  await loadSettings();
+}
+
+// Reads the saved settings into mySettings. Without a file the defaults stay.
+Future<void> loadSettings() async {
+  try {
+    final file = File('${(await _getFolder()).path}/settings.json');
+    if (await file.exists()) {
+      final json = jsonDecode(await file.readAsString());
+      mySettings.value = AppSettings.fromJson(json as Map<String, dynamic>);
+    }
+  } catch (e) {
+    debugPrint('Could not load the settings: $e');
+  }
+}
+
+// Changes the settings everywhere in the app and saves them
+Future<void> saveSettings(AppSettings settings) async {
+  mySettings.value = settings;
+  try {
+    final file = File('${(await _getFolder()).path}/settings.json');
+    await file.writeAsString(jsonEncode(settings.toJson()));
+  } catch (e) {
+    debugPrint('Could not save the settings: $e');
   }
 }
 

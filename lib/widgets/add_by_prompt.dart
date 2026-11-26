@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../data/sample_data.dart';
+import '../models/app_settings.dart';
 import '../models/calendar_event.dart';
 import '../models/task_draft.dart';
 import '../services/llm_service.dart';
@@ -68,7 +69,14 @@ class _AddByPromptState extends State<AddByPrompt> {
       final task = await readTaskFromPrompt(prompt, client: widget.client);
       final taskWithId =
           task.id == null ? task.withId(newModelId('task')) : task;
-      final slots = findSlots(taskWithId, myEvents, DateTime.now());
+      final settings = mySettings.value;
+      final slots = findSlots(
+        taskWithId,
+        myEvents,
+        DateTime.now(),
+        dayStartMinutes: settings.workStartMinutes,
+        dayEndMinutes: settings.workEndMinutes,
+      );
       if (!mounted) return;
       setState(() {
         _readTask = taskWithId;

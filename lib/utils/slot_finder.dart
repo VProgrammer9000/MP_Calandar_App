@@ -2,7 +2,8 @@ import '../models/calendar_event.dart';
 import '../models/task_draft.dart';
 import 'dates.dart';
 
-// Blocks are only placed between these hours
+// Blocks are only placed between these hours, unless the user picked other
+// working hours in the settings
 const dayStartHour = 8;
 const dayEndHour = 22;
 // How far ahead we look if the task has no deadline
@@ -16,8 +17,10 @@ const defaultBlockMinutes = 120;
 List<CalendarEvent> findSlots(
   TaskDraft task,
   List<CalendarEvent> events,
-  DateTime now,
-) {
+  DateTime now, {
+  int dayStartMinutes = dayStartHour * 60,
+  int dayEndMinutes = dayEndHour * 60,
+}) {
   final taskId = task.id ?? newModelId('task');
   final totalMinutes = task.length?.inMinutes ?? 60;
 
@@ -54,7 +57,8 @@ List<CalendarEvent> findSlots(
     while (day.isBefore(searchEnd) && slots.length < blocks.length) {
       if (!onePerDay || !usedDays.contains(day)) {
         final minutes = blocks[slots.length];
-        final start = _findFreeTime(day, minutes, busy, searchStart, searchEnd);
+        final start = _findFreeTime(day, minutes, busy, searchStart,
+            searchEnd, dayStartMinutes, dayEndMinutes);
         if (start != null) {
           final slot = _makeBlock(task, taskId, start, minutes);
           slots.add(slot);
@@ -85,10 +89,12 @@ DateTime? _findFreeTime(
   List<CalendarEvent> busy,
   DateTime searchStart,
   DateTime searchEnd,
+  int dayStartMinutes,
+  int dayEndMinutes,
 ) {
   final length = Duration(minutes: minutes);
-  final dayStart = DateTime(day.year, day.month, day.day, dayStartHour);
-  var dayEnd = DateTime(day.year, day.month, day.day, dayEndHour);
+  final dayStart = DateTime(day.year, day.month, day.day, 0, dayStartMinutes);
+  var dayEnd = DateTime(day.year, day.month, day.day, 0, dayEndMinutes);
   if (searchEnd.isBefore(dayEnd)) dayEnd = searchEnd;
 
   var time = searchStart.isAfter(dayStart) ? searchStart : dayStart;

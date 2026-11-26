@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../data/sample_data.dart';
+import '../models/app_settings.dart';
 import '../models/calendar_change.dart';
 import '../models/calendar_event.dart';
 import '../services/chat_service.dart';
@@ -105,7 +106,21 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final plan = await planChanges(message, myEvents,
           history: history, client: widget.client);
-      _messages.add(_Message(plan.reply, plan: plan));
+      // with "Ask before changing my calendar" turned off in the settings
+      // the changes go in right away, without the review page
+      final applyNow =
+          !mySettings.value.askBeforeChanging && plan.changes.isNotEmpty;
+      if (applyNow) {
+        applyChanges(plan.changes, myEvents);
+        saveData();
+      }
+      _messages.add(_Message(plan.reply,
+          plan: plan, accepted: applyNow ? true : null));
+      if (applyNow && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('The changes are in your calendar.'),
+        ));
+      }
     } on LlmException catch (e) {
       _messages.add(_Message(e.message));
     } finally {

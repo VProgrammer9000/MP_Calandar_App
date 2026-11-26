@@ -102,3 +102,7 @@ String formatDuration(Duration d) {
 // e.g. "Fri 16 Oct"
 String formatShortDate(DateTime d) =>
     '${weekdayNames[d.weekday - 1].substring(0, 3)} ${d.day} ${monthNames[d.month - 1]}';
+
+// minutes after midnight as a time, 510 -> "08:30"
+String formatMinutes(int minutes) =>
+    '${twoDigits(minutes ~/ 60)}:${twoDigits(minutes % 60)}';

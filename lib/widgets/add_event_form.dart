@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/sample_data.dart';
+import '../models/app_settings.dart';
 import '../models/task_draft.dart';
 import '../models/task_label.dart';
 import '../utils/dates.dart';
@@ -81,8 +82,15 @@ class _AddEventFormState extends State<AddEventForm> {
       fixed: _fixed,
       priority: _priority,
     );
-    myEvents.addAll(
-        findSlots(draft.withId(newModelId('task')), myEvents, DateTime.now()));
+    final settings = mySettings.value;
+    myEvents.addAll(findSlots(
+      draft.withId(newModelId('task')),
+      myEvents,
+      DateTime.now(),
+      dayStartMinutes: settings.workStartMinutes,
+      dayEndMinutes: settings.workEndMinutes,
+      defaultTaskMinutes: settings.defaultTaskMinutes,
+    ));
     Navigator.pop(context);
   }
 

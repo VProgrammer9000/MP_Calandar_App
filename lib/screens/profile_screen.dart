@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../models/app_settings.dart';
+import '../utils/dates.dart';
 import 'import_export_screen.dart';
 import 'labels_screen.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
 
-// Layout follows wireframe 1l. All values are placeholders for now.
+// Layout follows wireframe 1l. The name and working hours come from the
+// settings, the other values are placeholders for now.
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -124,16 +127,24 @@ class ProfileScreen extends StatelessWidget {
             child: const Icon(Icons.person, size: 36, color: Colors.grey),
           ),
           const SizedBox(width: 16),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Jane Doe',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ValueListenableBuilder<AppSettings>(
+                  valueListenable: mySettings,
+                  builder: (context, settings, _) => Text(
+                    settings.name.isEmpty
+                        ? 'Add your name in Settings'
+                        : settings.name,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-                SizedBox(height: 4),
-                Text(
+                const SizedBox(height: 4),
+                const Text(
                   'jane.doe@example.com',
                   style: TextStyle(color: Colors.grey),
                 ),
@@ -180,27 +191,33 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildWorkingHours() {
-    return const Padding(
-      padding: EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'WORKING HOURS',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-              letterSpacing: 1.2,
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: ValueListenableBuilder<AppSettings>(
+        valueListenable: mySettings,
+        builder: (context, settings, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'WORKING HOURS',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+                letterSpacing: 1.2,
+              ),
             ),
-          ),
-          SizedBox(height: 8),
-          Text('Mon - Fri, 09:00 - 17:00'),
-          SizedBox(height: 2),
-          Text(
-            'Lunch break 12:00 - 13:00',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              'Every day, ${formatMinutes(settings.workStartMinutes)} - '
+              '${formatMinutes(settings.workEndMinutes)}',
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'New tasks are only planned in these hours',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
       ),
     );
   }

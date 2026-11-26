@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../data/sample_data.dart';
+import '../models/app_settings.dart';
 import '../models/calendar_event.dart';
 import '../models/task_draft.dart';
 import '../services/llm_service.dart';
 import '../utils/dates.dart';
 import '../utils/slot_finder.dart';
+import 'settings_summary.dart';
 
 const _examplePrompts = [
   'Study 6h before Friday',
@@ -68,7 +70,15 @@ class _AddByPromptState extends State<AddByPrompt> {
       final task = await readTaskFromPrompt(prompt, client: widget.client);
       final taskWithId =
           task.id == null ? task.withId(newModelId('task')) : task;
-      final slots = findSlots(taskWithId, myEvents, DateTime.now());
+      final settings = mySettings.value;
+      final slots = findSlots(
+        taskWithId,
+        myEvents,
+        DateTime.now(),
+        dayStartMinutes: settings.workStartMinutes,
+        dayEndMinutes: settings.workEndMinutes,
+        defaultTaskMinutes: settings.defaultTaskMinutes,
+      );
       if (!mounted) return;
       setState(() {
         _readTask = taskWithId;
@@ -153,7 +163,20 @@ class _AddByPromptState extends State<AddByPrompt> {
               ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
+        // the settings the planner uses right now
+        SettingsSummary(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          text: (settings) {
+            final start = formatMinutes(settings.workStartMinutes);
+            final end = formatMinutes(settings.workEndMinutes);
+            final length = formatDuration(
+              Duration(minutes: settings.defaultTaskMinutes),
+            );
+            return 'Plans between $start and $end · no length = $length';
+          },
+        ),
+        const SizedBox(height: 8),
         TextButton(
           style: _blackButtonStyle,
           onPressed: _loading ? null : _readPrompt,

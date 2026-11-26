@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../models/app_settings.dart';
 import '../models/calendar_change.dart';
 import '../models/calendar_event.dart';
 import '../utils/dates.dart';
@@ -43,7 +44,8 @@ Future<ChatPlan> planChanges(
     [
       {
         'role': 'system',
-        'content': buildPlanPrompt(now ?? DateTime.now(), events),
+        'content': buildPlanPrompt(now ?? DateTime.now(), events,
+            settings: mySettings.value),
       },
       ...recent,
       {'role': 'user', 'content': message},
@@ -86,16 +88,31 @@ Future<ChatPlan> planChanges(
   return ChatPlan(reply: reply.trim(), changes: changes, skipped: skipped);
 }
 
-String buildPlanPrompt(DateTime now, List<CalendarEvent> events) {
+// The settings are what the user picked on the settings page, so changing
+// them changes how the assistant plans
+String buildPlanPrompt(
+  DateTime now,
+  List<CalendarEvent> events, {
+  AppSettings settings = const AppSettings(),
+}) {
   final weekday = weekdayNames[now.weekday - 1];
+  final dayStart = formatMinutes(settings.workStartMinutes);
+  final dayEnd = formatMinutes(settings.workEndMinutes);
   final today = _formatDate(now);
   final lines = [
     for (var i = 0; i < events.length; i++) _describeEvent(i, events[i]),
   ].join('\n');
+  final name = settings.name.isEmpty
+      ? ''
+      : 'The user is called ${settings.name}. Use the name now and then.\n';
+  final language = settings.language == AssistantLanguage.korean
+      ? 'Korean'
+      : 'English';
 
   return '''
 You are the assistant in a calendar app. You help the user plan their week.
 Today is $weekday $today and the time is ${formatTime(now)}.
+${name}Write "reply" in $language. Everything else in the JSON stays as below.
 
 These are the events in the calendar, each with its number:
 $lines
@@ -125,6 +142,8 @@ Rules:
 - If an overlap with a fixed event can't be avoided, make no changes and
   explain why in the reply.
 - A move must give the event a new time, never the time it already has.
+- The user's working hours are $dayStart to $dayEnd. Only put new events and
+  moved flexible events inside them, unless the user asks for another time.
 - If the user only asks a question, answer it and leave "changes" empty.
 ''';
 }
